@@ -5,7 +5,7 @@ import re
 input_filename = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the file to be read in
 
 
-# --User inputs and input processing--
+# -- User inputs and input processing--
 
 selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
 if not selected_type:
@@ -22,9 +22,9 @@ if not beam_prefix:
     print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
     exit(1)
 
-# selected_angle = input("Enter the desired HMS angle (present options: ): ").strip() #  This isn't a good idea for HMSDIS...
+# selected_angle = input("Enter the desired HMS angle (present options: ): ").strip() #  This is kind of pointless for HMSDIS, only one setting... commenting out
 
-selected_target = input("Enter desired target (options: C, Cu, Al, LD2, Dummy): ").strip().lower()
+selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
 selected_target_shortcut_to_target_variable = {"al":"aluminum","al13":"aluminum","aluminum":"aluminum",
                                                "c":"carbon","c12":"carbon","carbon":"carbon",
                                                "cu":"copper","cu29":"copper","copper":"copper",
@@ -45,16 +45,16 @@ output_filename = f"{selected_target_shortname.upper()}/{selected_type}_{selecte
 with open(input_filename, "r") as infile:
     lines = infile.readlines()
 
-# Header lines
-header_lines = []
+
+# header_lines = [] # Not going to bother saving the header lines from the runlist.
 run_lines = []
 
 for line in lines:
-    if line.lstrip().startswith("#"):        # drop comment lines
+    if line.lstrip().startswith("#"):        # dropping comment lines
         continue
-    if line.lstrip().startswith("!"):        # drop lines starting with !
+    if line.lstrip().startswith("!"):        # dropping lines starting with !
         continue
-    if re.match(r"^\s*[-=*]", line):         # drop separator lines
+    if re.match(r"^\s*[-=*]", line):         # dropping separator lines
         continue
     run_lines.append(line)
 
@@ -120,8 +120,16 @@ with open(output_filename, "w") as outfile:
         tsv_line = "\t".join(fixed + [comment_field])
         outfile.write(tsv_line + "\n")
 
+# -- Adding on to this to make runnum csvs
 
+output_runnums_filename = f"RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
+
+with open(output_runnums_filename, "w") as outfile:
+        runnums = [re.split(r'\s+',line.strip())[0] for line in filtered_lines]
+        outfile.write(",".join(runnums))
+        
 #####
 
 
-print(f"\n✅ Wrote {len(filtered_lines)} matching lines to {output_filename}")
+print(f"\n☢️  Wrote {len(filtered_lines)} matching lines to {output_filename}")
+print(f"\n☢️  Wrote matching run numbers to {output_runnums_filename}")
