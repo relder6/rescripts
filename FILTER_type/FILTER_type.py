@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import re
+import os, re
 
-input_filename = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the file to be read in
+input_filename = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
+report_filepath = "/net/cdaq/cdaql3data/cdaq/hallc-online-rsidis2025/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
 
 
 # -- User inputs and input processing--
@@ -105,31 +106,70 @@ for line in run_lines:
     ):
         filtered_lines.append(line)
 
-#expected_columns = 13  # Run# through Run_type (12) + Comment (13th)
-with open(output_filename, "w") as outfile:
-    # Write header
-    outfile.write("#Run#\tdate\ttstart\tebeam\tIbeam\ttarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tps1,ps2,ps3,ps4,ps5,ps6\truntype\t# comments\n")
-    for line in filtered_lines:
-        parts = re.split(r'\s+', line.strip())
-        # First 12 columns: standard columns
-        fixed = parts[:12]
-        # Everything after the 12th part gets joined together as the comment
-        comment = " ".join(parts[12:]) if len(parts) > 12 else ""
-        comment_field = f"# {comment}" if comment else ""   # Only add marker if there is a comment
-        # Compose the TSV line
-        tsv_line = "\t".join(fixed + [comment_field])
-        outfile.write(tsv_line + "\n")
-
-# -- Adding on to this to make runnum csvs
-
+# -- Adding function to make csv of runnums.  Then, reading it in, so runnums can be used below.
+        
 output_runnums_filename = f"RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
 
 with open(output_runnums_filename, "w") as outfile:
-        runnums = [re.split(r'\s+',line.strip())[0] for line in filtered_lines]
-        outfile.write(",".join(runnums))
-        
-#####
+    runnums = [re.split(r'\s+',line.strip())[0] for line in filtered_lines]
+    outfile.write(",".join(runnums))
 
+with open(output_runnums_filename, "r") as infile:
+    runnums = infile.read().strip().split(",")
+
+# -- Function to write the output file
+        
+with open(output_filename, "w") as outfile:
+    # Write header
+    outfile.write("#Run#\tdate\ttstart\tebeam\tIbeam\ttarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tps1,ps2,ps3,ps4,ps5,ps6\truntype\tBCM2CutCh\tPs3\tPs4\tLiveTime\t# comments\n")
+    
+    for line in filtered_lines:
+        parts = re.split(r'\s+', line.strip())
+        # First 12 columns: standard columns
+        runnum = parts[0]
+        date = parts[1]
+        tstart = parts[2]
+        ebeam = parts[3]
+        ibeam = parts[4]
+        target = parts[5]
+        hms_p = parts[6]
+        hms_th = parts[7]
+        shms_p = parts[8]
+        shms_th = parts[9]
+        prescales = parts[10]
+        runtype = parts[11]
+        comment = " ".join(parts[12:]) if len(parts) > 12 else "" #This joins everything after the 12th column together as a comment.
+        if comment and not comment.startswith("# "):
+            comment = "# " + comment
+            
+        # -- Extracting values from the report files
+
+        report_file = report_filepath.format(runnum=runnum)
+        bcm2cutch, ps3, ps4, livetime = "N/A", "N/A", "N/A", "N/A"
+
+        if os.path.exists(report_file):
+            with open(report_file, "r") as rep:
+                for rep_line in rep:
+                    if rep_line.startswith("BCM2  Beam Cut Charge: "):
+                        m = re.search(r"([\d.]+)\s+uC", rep_line)
+                        if m:
+                            bcm2cutch = m.group(1)
+                    elif rep_line.startswith("Ps3_factor = "):
+                        m = re.search(r"Ps3_factor\s*=\s*([+-]?\d+)", rep_line)
+                        if m:
+                            ps3 = m.group(1)
+                    elif rep_line.startswith("Ps4_factor = "):
+                        m = re.search(r"Ps4_factor\s*=\s*([+-]?\d+)", rep_line)
+                        if m:
+                            ps4 = m.group(1)
+                    elif rep_line.startswith("HMS Computer Dead Time : "):
+                        m = re.search(r"(-?[\d.]+)\s%", rep_line)
+                        if m:
+                            livetime = m.group(1)            
+
+        # Composing the tsv line
+        tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, comment ])
+        outfile.write(tsv_line + "\n")
 
 print(f"\n☢️  Wrote {len(filtered_lines)} matching lines to {output_filename}")
 print(f"\n☢️  Wrote matching run numbers to {output_runnums_filename}")
