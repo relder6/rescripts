@@ -2,7 +2,7 @@
 
 import os, re
 
-input_filename = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
+input_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
 report_filepath = "/net/cdaq/cdaql3data/cdaq/hallc-online-rsidis2025/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
 
 
@@ -41,9 +41,9 @@ if not selected_target_shortname:
     print(f"Unknown target: {selected_target}.  Please try again.")
     exit(1)
 
-output_filename = f"{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
+output_filepath = f"{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
 
-with open(input_filename, "r") as infile:
+with open(input_filepath, "r") as infile:
     lines = infile.readlines()
 
 
@@ -87,11 +87,11 @@ def extract_fields(line):
 
 filtered_lines = []
 
-# debug_output_filename = "debug_extract_fields.txt"
-# debug_outfile = open(debug_output_filename, "w")
+# debug_output_filepath = "debug_extract_fields.txt"
+# debug_outfile = open(debug_output_filepath, "w")
 
-# debug_output_filename = "debug_extract_fields.txt"
-# with open(debug_output_filename, "w") as debug_outfile:
+# debug_output_filepath = "debug_extract_fields.txt"
+# with open(debug_output_filepath, "w") as debug_outfile:
 #     for line in run_lines:
 #         ebeam, target_type, run_type = extract_fields(line)
 #         debug_outfile.write(f"ebeam: {ebeam} target: {target_type} run_type: {run_type}\n")
@@ -108,18 +108,18 @@ for line in run_lines:
 
 # -- Adding function to make csv of runnums.  Then, reading it in, so runnums can be used below.
         
-output_runnums_filename = f"RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
+output_runnums_filepath = f"RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
 
-with open(output_runnums_filename, "w") as outfile:
+with open(output_runnums_filepath, "w") as outfile:
     runnums = [re.split(r'\s+',line.strip())[0] for line in filtered_lines]
     outfile.write(",".join(runnums))
 
-with open(output_runnums_filename, "r") as infile:
+with open(output_runnums_filepath, "r") as infile:
     runnums = infile.read().strip().split(",")
 
 # -- Function to write the output file
         
-with open(output_filename, "w") as outfile:
+with open(output_filepath, "w") as outfile:
     # Write header
     outfile.write("#Run#\tdate\ttstart\tebeam\tIbeam\ttarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tps1,ps2,ps3,ps4,ps5,ps6\truntype\tBCM2CutCh\tPs3\tPs4\tLiveTime\t# comments\n")
     
@@ -171,5 +171,5 @@ with open(output_filename, "w") as outfile:
         tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, comment ])
         outfile.write(tsv_line + "\n")
 
-print(f"\n☢️  Wrote {len(filtered_lines)} matching lines to {output_filename}")
-print(f"\n☢️  Wrote matching run numbers to {output_runnums_filename}")
+print(f"\n☢️  Wrote {len(filtered_lines)} matching lines to {output_filepath}")
+print(f"\n☢️  Wrote matching run numbers to {output_runnums_filepath}")
