@@ -1,1 +1,1 @@
-#Run#	date	tstart	ebeam	Ibeam	target	HMSp	HMSth	SHMSp	SHMSth	ps1,ps2,ps3,ps4,ps5,ps6	runtype	# comments
+#Run#	date	tstart	ebeam	Ibeam	target	HMSp	HMSth	SHMSp	SHMSth	ps1,ps2,ps3,ps4,ps5,ps6	runtype	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	hELREAL	TrackEff	# comments

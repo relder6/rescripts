@@ -1,3 +1,3 @@
-#Run#	date	tstart	ebeam	Ibeam	target	HMSp	HMSth	SHMSp	SHMSth	ps1,ps2,ps3,ps4,ps5,ps6	runtype	# comments
-24373	07/29	18:33	8.5831	25	Aluminum	-1.531	29.05	+3.632	7.87	-1,-1,-1,0,-1,-1	HMSDIS	# 0
-24375	07/29	19:05	8.5831	25	Aluminum	-1.531	29.05	+3.632	7.87	-1,-1,3,-1,-1,-1	HMSDIS	# 0
+#Run#	date	tstart	ebeam	Ibeam	target	HMSp	HMSth	SHMSp	SHMSth	ps1,ps2,ps3,ps4,ps5,ps6	runtype	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	hELREAL	TrackEff	# comments
+24373	07/29	18:33	8.5831	25	Aluminum	-1.531	29.05	+3.632	7.87	-1,-1,-1,0,-1,-1	HMSDIS	42471.401	-1	1	1.0	1594450	1594248	0.9987	# 0
+24375	07/29	19:05	8.5831	25	Aluminum	-1.531	29.05	+3.632	7.87	-1,-1,3,-1,-1,-1	HMSDIS	21521.311	5	-1	1.0	1999789	809664	0.9982	# 0

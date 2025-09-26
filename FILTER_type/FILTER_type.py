@@ -3,7 +3,8 @@
 import os, re
 
 input_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
-report_filepath = "/net/cdaq/cdaql3data/cdaq/hallc-online-rsidis2025/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
+# report_filepath = "/net/cdaq/cdaql3data/cdaq/hallc-online-rsidis2025/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
+report_filepath = "//work/hallc/c-rsidis/cmorean/replay_pass0a/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
 
 
 # -- User inputs and input processing--
@@ -121,7 +122,7 @@ with open(output_runnums_filepath, "r") as infile:
         
 with open(output_filepath, "w") as outfile:
     # Write header
-    outfile.write("#Run#\tdate\ttstart\tebeam\tIbeam\ttarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tps1,ps2,ps3,ps4,ps5,ps6\truntype\tBCM2CutCh\tPs3\tPs4\tLiveTime\t# comments\n")
+    outfile.write("#Run#\tdate\ttstart\tebeam\tIbeam\ttarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tps1,ps2,ps3,ps4,ps5,ps6\truntype\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\thELREAL\tTrackEff\t# comments\n")
     
     for line in filtered_lines:
         parts = re.split(r'\s+', line.strip())
@@ -145,7 +146,7 @@ with open(output_filepath, "w") as outfile:
         # -- Extracting values from the report files
 
         report_file = report_filepath.format(runnum=runnum)
-        bcm2cutch, ps3, ps4, livetime = "N/A", "N/A", "N/A", "N/A"
+        bcm2cutch, ps3, ps4, trackeff, phystriggers, helreal = "-999", "-999", "-999", "-999", "-999", "-999"
 
         if os.path.exists(report_file):
             with open(report_file, "r") as rep:
@@ -162,13 +163,40 @@ with open(output_filepath, "w") as outfile:
                         m = re.search(r"Ps4_factor\s*=\s*([+-]?\d+)", rep_line)
                         if m:
                             ps4 = m.group(1)
-                    elif rep_line.startswith("HMS Computer Dead Time : "):
-                        m = re.search(r"(-?[\d.]+)\s%", rep_line)
+                    elif rep_line.startswith("E SING FID TRACK EFFIC         :     "):
+                        m = re.search(r"([\d.]+)\s", rep_line)
                         if m:
-                            livetime = m.group(1)            
+                            trackeff = m.group(1)
+                    elif rep_line.startswith("Accepted Physics Triggers      : "):
+                        m = re.search(r"([\d.]+)\s", rep_line)
+                        if m:
+                            phystriggers = m.group(1)
+                    elif rep_line.startswith("hEL_REAL  :	"):
+                        m = re.search(r"([\d.]+)\s", rep_line)
+                        if m:
+                            helreal = m.group(1)
 
+        ps3_val, ps4_val = float(ps3), float(ps4)
+        if ps3_val == -999 or ps4_val == -999:
+            print(f"WARNING: run {runnum} has issues with prescale values.  Fix the lookup table for this setting!")
+            continue
+        elif ps3_val != -1 and ps4_val != -1:
+            print(f"WARNING: run {runnum} has both prescales set (ps3={ps3_val}, ps4={ps4_val}), using ps3.")
+        elif ps3_val != -1 and ps4_val == -1:
+            ps = ps3_val
+        elif ps4_val != -1 and ps3_val == -1:
+            ps = ps4_val
+        else:
+            print(f"Run {runnum} has no valid prescale (both -1), skipping...")
+            continue
+        livetime_unformatted = float(ps) * float(phystriggers) / float(helreal)
+        if livetime_unformatted > 1:
+            livetime_unformatted = 1
+        livetime = float(livetime_unformatted)
         # Composing the tsv line
-        tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, comment ])
+        # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, comment ])
+        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th,prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, comment]))
+
         outfile.write(tsv_line + "\n")
 
 print(f"\n☢️  Wrote {len(filtered_lines)} matching lines to {output_filepath}")

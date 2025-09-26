@@ -9,6 +9,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
+from tqdm import tqdm
 
 # -- User inputs and input processing, logic to select the setting--
 
@@ -43,23 +45,19 @@ if not selected_target_shortname:
     print(f"Unknown target: {selected_target}.  Please try again.")
     exit(1)
     
-input_runnums_filepath = f"../FILTER_type/RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv" # The name and location of the input runnums file
 input_settings_filepath = f"../FILTER_type/{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the lookup tables for the input runs by setting
 
 
-# with open(input_runnums_filepath, "r") as infile: # Realized I did NOT need to do this, I already have a convenient table with everything.  Duh!
-#     runnums_line = infile.readline().strip()
-#     runnums = [int(run) for run in runnums_line.split(",")]
-#     print(f"Found list of run numbers for analysis: {runnums}")
-
-# Leaving ordered list of all the components of the lookup table: runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, comment
+# Leaving ordered list of all the components of the lookup table:
+# Run#	date	tstart	ebeam	Ibeam	target	HMSp	HMSth	SHMSp	SHMSth	ps1,ps2,ps3,ps4,ps5,ps6	runtype	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	hELREAL	TrackEff	# comments
 
 runnums = []
 prescale3_factors = []
 prescale4_factors = []
 beam_charges = []
-# tracking_effs = []
+tracking_effs = []
 livetimes = []
+hmsmomentum = []
 
 
 
@@ -72,15 +70,18 @@ with open(input_settings_filepath, "r") as infile:
         prescale4_factors.append(parts[14])
         beam_charges.append(parts[12])
         livetimes.append(parts[15])
+        tracking_effs.append(parts[18])
+        hmsmomentum.append(parts[6])
+        
 
-def parse_prescale(val):
-    val = val.strip()
-    if val in ("N/A", ""):
-        return -999.0
-    else:
-        return float(val)
+# def parse_prescale(val):
+#     val = val.strip()
+#     if val in ("N/A", ""):
+#         return -999.0
+#     else:
+#         return float(val)
 
-tracking_effs = [1.0] * len(runnums) # assuming tracking efficiencies are 1 for now
+# tracking_effs = [1.0] * len(runnums) # assuming tracking efficiencies are 1 for now
 
 branches = ["H.gtr.dp", "H.cer.npeSum", "H.cal.etottracknorm"]
 
@@ -90,10 +91,11 @@ hist = bh.Histogram(bh.axis.Regular(100, -10, 10), storage = bh.storage.Weight()
 
 results = []
 
-for runnum, ps3, ps4, charge, eff, livetime in zip(
-        runnums, prescale3_factors, prescale4_factors, beam_charges, tracking_effs, livetimes):
-    ps3_val = parse_prescale(ps3)
-    ps4_val = parse_prescale(ps4)
+print(f"Starting analysis for {len(runnums)} runs...")
+
+for idx, (runnum, ps3, ps4, charge, eff, livetime) in enumerate(tqdm(zip(runnums, prescale3_factors, prescale4_factors, beam_charges, tracking_effs, livetimes), total=len(runnums))):
+    ps3_val = float(ps3)
+    ps4_val = float(ps4)
 
     if ps3_val == -999 or ps4_val == -999:
         print(f"WARNING: run {runnum} has issues with prescale values.  Fix the lookup table for this setting!")
@@ -109,10 +111,11 @@ for runnum, ps3, ps4, charge, eff, livetime in zip(
         continue
 
         
-    input_root_filepath = f"~/rsidis-2025/hallc_replay_rsidis/ROOTfiles/hms_coin_replay_production_{runnum}_-1.root"
+    # input_root_filepath = f"~/rsidis-2025/hallc_replay_rsidis/ROOTfiles/hms_coin_replay_production_{runnum}_-1.root"
+    input_root_filepath = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles/hms_coin_replay_production_{runnum}_-1.root"
     try:
         with uproot.open(input_root_filepath) as file:
-            
+            # print(f"Starting analysis for run {runnum}, continuing...")
             if "T" not in file:
                 print(f"No 'T' tree in run {runnum}, skipping...")
                 continue
@@ -126,11 +129,13 @@ for runnum, ps3, ps4, charge, eff, livetime in zip(
             data = tree.arrays(branches, library = "np")
 
             cut = (
-                (data["H.cer.npeSum"] > 1) &
-                (data["H.cal.etottracknorm"] > 0.7)
+                (data["H.cer.npeSum"] > 2) &
+                (data["H.cal.etottracknorm"] > 0.8) &
+                (data["H.gtr.dp"] > -8.0) &
+                (data["H.gtr.dp"] < 8.0)
                 )
 
-            weight = ps / ( float(livetime) * float(charge) * float(eff))
+            weight = 1000 * ps / ( float(livetime) * float(charge) * float(eff))
             weights = np.full_like(data[delta], weight, dtype = float)
 
             hist.reset()
@@ -139,33 +144,114 @@ for runnum, ps3, ps4, charge, eff, livetime in zip(
             delta_yield = hist.sum().value
             delta_yield_err = hist.sum().variance**0.5
 
+            print(f"Run {runnum}: yield = {delta_yield:.6g}, error = ±{delta_yield_err:.6g}")
+
             results.append({"runnum": runnum, "yield": delta_yield, "yield_err": delta_yield_err})
 
-            print(f"Filled histogram for run {runnum}, moving on...")
+            # print(f"Filled histogram for run {runnum}, moving on...")
 
     except FileNotFoundError:
         print(f"Missing file for run {runnum}, skipping...")
             
 df = pd.DataFrame(results)
 
+# #################
+
+# -- Categorizing runs based on central momentum polarity for plotting with different shapes
+momentum_values = np.array([float(m) for m in hmsmomentum[:len(df)]])
+pos_mask = momentum_values > 0
+elec_mask = momentum_values <= 0
+
+parsed_ps3 = np.array([float(ps3) for ps3 in prescale3_factors[:len(df)]])
+x_indices = np.arange(len(df))
+
+# -- Categorizing runs based on prescale for plotting with different colors
+ps3_mask = (parsed_ps3 != -999) & (parsed_ps3 != -1)
+ps4_mask = ~ps3_mask
+
+# plt.figure(figsize=(12,6))
+
+# # -- Plotting Ps3 electrons
+# plt.scatter(x_indices[elec_mask & ps3_mask], df["yield"][elec_mask & ps3_mask],
+#             color='red', s=10, marker='o', label='Ps3 HMS 3/4 elec')
+
+# # -- Plotting Ps4 electrons
+# plt.scatter(x_indices[elec_mask & ps4_mask], df["yield"][elec_mask & ps4_mask],
+#             color='blue', s=10, marker='o', label='Ps4 HMS ELREAL elec')
+
+# # -- Plotting Ps3 positrons
+# plt.scatter(x_indices[pos_mask & ps3_mask], df["yield"][pos_mask & ps3_mask],
+#             color='red', s=10, marker='x', label='Ps3 HMS 3/4 pos')
+
+# # -- Plotting Ps4 positrons
+# plt.scatter(x_indices[pos_mask & ps4_mask], df["yield"][pos_mask & ps4_mask],
+#             color='blue', s=10, marker='x', label='Ps4 HMS ELREAL pos')
+
+# plt.errorbar(x_indices, df["yield"], yerr=df["yield_err"], fmt='none', ecolor='black')
+
+# plt.xticks(x_indices, df["runnum"], rotation=45)
+# plt.xlabel("Run Number")
+# plt.ylabel("Delta Yield per mC")
+# plt.title(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields")
+# plt.grid(True, linestyle='--', alpha=0.7)
+
+# legend_handles = [
+#     Line2D([0], [0], color='red', marker='o', linestyle='None', markersize=6, label='Ps3 HMS 3/4 elec'),
+#     Line2D([0], [0], color='blue', marker='o', linestyle='None', markersize=6, label='Ps4 HMS ELREAL elec'),
+#     Line2D([0], [0], color='red', marker='x', linestyle='None', markersize=6, label='Ps3 HMS 3/4 pos'),
+#     Line2D([0], [0], color='blue', marker='x', linestyle='None', markersize=6, label='Ps4 HMS ELREAL pos'),
+#     Line2D([0], [0], color='black', marker='_', linestyle='-', markersize=10, label='Error bar')
+# ]
+
+# plt.legend(handles=legend_handles)
+
+# plt.tight_layout()
+# plt.savefig(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields.png")
+
 plt.figure(figsize=(12,6))
 
-parsed_ps3 = [parse_prescale(ps3) for ps3 in prescale3_factors[:len(df)]]
+# Ps3 electrons
+plt.scatter(x_indices[elec_mask & ps3_mask], df["yield"][elec_mask & ps3_mask],
+            color='red', s=20, marker='o', label='Ps3 HMS 3/4 elec')
+plt.errorbar(x_indices[elec_mask & ps3_mask], df["yield"][elec_mask & ps3_mask],
+             yerr=df["yield_err"][elec_mask & ps3_mask], fmt='none', ecolor='red')
 
-colors = ['red' if ps_val != -999.0 and ps_val != -1 else 'blue' for ps_val in parsed_ps3]
+# Ps4 electrons
+plt.scatter(x_indices[elec_mask & ps4_mask], df["yield"][elec_mask & ps4_mask],
+            color='blue', s=20, marker='o', label='Ps4 HMS ELREAL elec')
+plt.errorbar(x_indices[elec_mask & ps4_mask], df["yield"][elec_mask & ps4_mask],
+             yerr=df["yield_err"][elec_mask & ps4_mask], fmt='none', ecolor='blue')
 
-plt.scatter(range(len(df)), df["yield"], c=colors, s=10)
-plt.errorbar(range(len(df)), df["yield"], yerr=df["yield_err"], fmt='none', ecolor='black')
+# Ps3 positrons
+plt.scatter(x_indices[pos_mask & ps3_mask], df["yield"][pos_mask & ps3_mask],
+            color='red', s=20, marker='x', label='Ps3 HMS 3/4 pos')
+plt.errorbar(x_indices[pos_mask & ps3_mask], df["yield"][pos_mask & ps3_mask],
+             yerr=df["yield_err"][pos_mask & ps3_mask], fmt='none', ecolor='red')
 
-plt.xticks(range(len(df)), df["runnum"], rotation=45)
-plt.xlabel("Run Number")
-plt.ylabel("Yield")
-plt.title(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields")
-plt.grid(True, linestyle='--', alpha=0.7)
+# Ps4 positrons
+plt.scatter(x_indices[pos_mask & ps4_mask], df["yield"][pos_mask & ps4_mask],
+            color='blue', s=20, marker='x', label='Ps4 HMS ELREAL pos')
+plt.errorbar(x_indices[pos_mask & ps4_mask], df["yield"][pos_mask & ps4_mask],
+             yerr=df["yield_err"][pos_mask & ps4_mask], fmt='none', ecolor='blue')
 
-red_patch = mpatches.Patch(color='red', label='Ps3 HMS 3/4')
-blue_patch = mpatches.Patch(color='blue', label='Ps4 HMS ELREAL')
-plt.legend(handles=[red_patch, blue_patch])
+plt.xticks(x_indices, df["runnum"], rotation=45, fontsize = 10)
+plt.xlabel("Run Number", fontsize = 12)
+plt.ylabel("Delta Yield per mC", fontsize = 12)
+plt.title(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields", fontsize = 14)
+plt.grid(True, linestyle='--', color = 'gray', alpha=0.3)
+plt.margins(y = 0.1)
+
+# legend_handles = [
+#     Line2D([0], [0], color='red', marker='o', linestyle='None', markersize=6, label='Ps3 HMS 3/4 elec'),
+#     Line2D([0], [0], color='blue', marker='o', linestyle='None', markersize=6, label='Ps4 HMS ELREAL elec'),
+#     Line2D([0], [0], color='red', marker='x', linestyle='None', markersize=6, label='Ps3 HMS 3/4 pos'),
+#     Line2D([0], [0], color='blue', marker='x', linestyle='None', markersize=6, label='Ps4 HMS ELREAL pos'),
+#     Line2D([0], [0], color='black', marker='_', linestyle='-', markersize=10, label='Error bar')
+# ]
+
+# plt.legend(frameon = True, handles=legend_handles, fontsize = 10)
+
+plt.legend(frameon = True, fontsize = 10)
 
 plt.tight_layout()
 plt.savefig(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields.png")
