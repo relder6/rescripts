@@ -15,9 +15,9 @@ for runnum in tqdm(range(23833, 25604)):
             stderr=subprocess.DEVNULL,
             check=True
             )
-        # print(result.stdout.decode())
+        # print(result.stdout.decode()) #Uncomment this line if you wish to see stdout prints.
 
     except subprocess.CalledProcessError as e:
-        tqdm.write(f"Error running script for {runnum}: {e}")
+        tqdm.write(f"Error code {e.returncode} for run {runnum}; check if this is an SHMS run.")
         continue
     
