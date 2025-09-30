@@ -5,17 +5,22 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gErrorIgnoreLevel = ROOT.kFatal
 import sys
 
-runnum = input(f"Input run number:")
+runnum = input(f"Input run number: ")
+
+# Directory information, modify as needed
+root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
+coin_pattern = f"coin_replay_production_{runnum}_-1.root"
+shms_pattern = f"shms_coin_replay_production_{runnum}_-1.root"
 
 try:
-    input_root_filepath = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles/coin_replay_production_{runnum}_-1.root"
+    input_root_filepath = f"{root_directory}/{coin_pattern}"
     f = ROOT.TFile.Open(input_root_filepath)
     file_type = "COIN"
     if not f or f.IsZombie():
         raise OSError(f"Failed to open file {input_root_filepath}")
 except OSError:
     try:
-        input_root_filepath = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles/shms_coin_replay_production_{runnum}_-1.root"
+        input_root_filepath = f"{root_directory}/{shms_pattern}"
         f = ROOT.TFile.Open(input_root_filepath)
         file_type = "SHMS"
         if not f or f.IsZombie():

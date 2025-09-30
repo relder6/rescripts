@@ -18,6 +18,6 @@ for runnum in tqdm(range(23833, 25604)):
         # print(result.stdout.decode())
 
     except subprocess.CalledProcessError as e:
-        tqdm.write(f"Error running script for {runnum}: {e}")
+        tqdm.write(f"Error code {e.returncode} for run {runnum}; check if this is an HMS run.")
         continue
     
