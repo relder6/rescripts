@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import boost_histogram as bh
 import matplotlib.colors as mplcolors
+from scipy.optimize import curve_fit
 
 runnum = input(f"Input the run number you wish to analyze:")
 
@@ -170,3 +171,50 @@ for i in range(numcols + 1):
 
 plt.savefig(f"{file_type}/{file_type}_run_{runnum}_etottracknorm_at_cal.png", bbox_inches="tight", dpi=300)
 plt.close()
+
+# Plotting e/p
+
+bin_min, bin_max, bin_num = 0, 2, 200
+data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
+
+counts, bin_edges = np.histogram(df_cut["P.cal.etottracknorm"], bins=data_bins)
+bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+# Fitting range
+fit_min, fit_max = 0.9, 1.1
+fit_mask = (bin_centers >= fit_min) & (bin_centers <= fit_max)
+
+x_fit = bin_centers[fit_mask]
+y_fit = counts[fit_mask]
+
+# Mask out zero bins because log-likelihood or fit weighting can fail
+nonzero = y_fit > 0
+x_fit = x_fit[nonzero]
+y_fit = y_fit[nonzero]
+
+# Guess for initial fit ONLY within fit range
+amp_guess = np.max(y_fit)
+mean_guess = np.sum(x_fit * y_fit) / np.sum(y_fit)
+sigma_guess = np.sqrt(np.sum(y_fit * (x_fit - mean_guess) ** 2) / np.sum(y_fit))
+
+def gaussian(x, amp, mean, sigma):
+    return amp * np.exp(-(x - mean)**2 / (2 * sigma**2))
+
+from scipy.optimize import curve_fit
+popt, _ = curve_fit(gaussian, x_fit, y_fit, p0=[amp_guess, mean_guess, sigma_guess])
+
+plt.figure()
+plt.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='e/p')
+plt.xlim(bin_min, bin_max)
+plt.xlabel("E/p", fontsize=12)
+plt.ylabel("Counts", fontsize=12)
+plt.title(f"Run {runnum} Fitted E/p", fontsize=16)
+plt.grid(alpha=0.5)
+
+# Plot the gaussian fit
+x_plot = np.linspace(fit_min, fit_max, 500)
+plt.plot(x_plot, gaussian(x_plot, *popt), 'b-', label='Gaussian fit')
+
+plt.legend()
+plt.tight_layout()
+plt.savefig("Testing.png")
