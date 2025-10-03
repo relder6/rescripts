@@ -45,7 +45,7 @@ except OSError:
         
 print(f"Found {file_type} run {runnum}.  Dataframe {len(df)} rows.  Processing...")
 
-cuts = ((df["P.gtr.dp"] > -15) & (df["P.gtr.dp"] < 27) & (df["P.ngcer.npeSum"] > 2) & (df["P.cal.etottracknorm"] > 0.7))
+cuts = ((df["P.gtr.dp"] > -15) & (df["P.gtr.dp"] < 27) & (df["P.ngcer.npeSum"] > 2))
 
 df_cut = df[cuts].copy()
 
@@ -143,11 +143,15 @@ im = ax.imshow(
     origin="lower",
     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
     aspect="auto",
-    cmap=cmap
+    cmap= cmap
 )
 
 ax.set_title(f"Run {runnum} Normalized E/p per Track at SHMS Calorimeter")
-fig.colorbar(im, ax=ax, label="Counts")
+
+imvmin, imvmax = im.get_clim()
+cbar = fig.colorbar(im, ax=ax, pad = 0.01, format='%.1f')
+cbar.ax.tick_params(labelsize=8)  # Consistent font size and spacing
+
 
 # Plotting the grid
 numrows, numcols = 16, 14
