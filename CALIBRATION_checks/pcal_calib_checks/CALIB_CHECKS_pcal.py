@@ -8,25 +8,25 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import boost_histogram as bh
+import matplotlib.colors as mplcolors
 
 runnum = input(f"Input the run number you wish to analyze:")
 
 # Directory information, modify as needed
 root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
 coin_pattern = f"coin_replay_production_{runnum}_-1.root"
-hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
+shms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
 
-d_calo_fp = 338.69 # distance from focal plane to calorimeter face
-d_dp_exit_fp = -147.48 # distance from focal plane to the dipole exit
+d_calo_fp = 292.64 # distance from focal plane to calorimeter face
 
 branches = [
-    "H.dc.x_fp",
-    "H.dc.y_fp",
-    "H.dc.xp_fp",
-    "H.dc.yp_fp",
-    "H.gtr.dp",
-    "H.cer.npeSum",
-    "H.cal.etottracknorm"
+    "P.dc.x_fp",
+    "P.dc.y_fp",
+    "P.dc.xp_fp",
+    "P.dc.yp_fp",
+    "P.gtr.dp",
+    "P.ngcer.npeSum",
+    "P.cal.etottracknorm"
 ]
 
 
@@ -36,34 +36,30 @@ try:
     file_type = "COIN"
 except OSError:
     try:
-        input_root_filepath = f"{root_directory}/{hms_pattern}"
+        input_root_filepath = f"{root_directory}/{shms_pattern}"
         df = pd.DataFrame(uproot.open(input_root_filepath)["T"].arrays(branches, library = "np"))
-        file_type = "HMS"
+        file_type = "SHMS"
     except OSError:
-        print(f"Run {runnum} not valid for hcal calibration; skipping...")
+        print(f"Run {runnum} not valid for pcal calibration; skipping...")
         sys.exit(1)
         
 print(f"Found {file_type} run {runnum}.  Dataframe {len(df)} rows.  Processing...")
 
-cuts = ((df["H.gtr.dp"].between(-8,8)) & (df["H.cer.npeSum"] > 1.5))
+cuts = ((df["P.gtr.dp"] > -15) & (df["P.gtr.dp"] < 27) & (df["P.ngcer.npeSum"] > 2) & (df["P.cal.etottracknorm"] > 0.7))
 
 df_cut = df[cuts].copy()
 
-xcalo = ((df_cut["H.dc.x_fp"]) + (df_cut["H.dc.xp_fp"])*d_calo_fp)
+xcalo = ((df_cut["P.dc.x_fp"]) + (df_cut["P.dc.xp_fp"])*d_calo_fp)
 
-ycalo = ((df_cut["H.dc.y_fp"]) + (df_cut["H.dc.yp_fp"])*d_calo_fp)
+ycalo = ((df_cut["P.dc.y_fp"]) + (df_cut["P.dc.yp_fp"])*d_calo_fp)
 
-xexit = ((df_cut["H.dc.x_fp"]) + (df_cut["H.dc.xp_fp"])*d_dp_exit_fp)
+weight = df_cut["P.cal.etottracknorm"]
 
-yexit = ((df_cut["H.dc.y_fp"]) + (df_cut["H.dc.yp_fp"])*d_dp_exit_fp)
+xbins, ybins = 200, 200
 
-weight = df_cut["H.cal.etottracknorm"]
+xmin, xmax = -60, 60
 
-xbins, ybins = 100, 100
-
-xmin, xmax = -65.4, 54.6
-
-ymin, ymax = -30, 30
+ymin, ymax = -58, 58
 
 xrange = (xmin - 10, xmax + 10)
 
@@ -71,9 +67,6 @@ yrange = (ymin - 10, ymax + 10)
 
 hCaloPos = bh.Histogram(bh.axis.Regular(xbins, xrange[0], xrange[1]), bh.axis.Regular(ybins, yrange[0], yrange[1]))
 hCaloPos.fill(ycalo, xcalo)
-
-hExitPos = bh.Histogram(bh.axis.Regular(xbins, xrange[0], xrange[1]), bh.axis.Regular(ybins, yrange[0], yrange[1]))
-hExitPos.fill(yexit, xexit)
 
 hCaloPosWtU = bh.Histogram(bh.axis.Regular(xbins, xrange[0], xrange[1]), bh.axis.Regular(ybins, yrange[0], yrange[1]))
 hCaloPosWtU.fill(ycalo,xcalo,weight=weight)
@@ -85,7 +78,11 @@ with np.errstate(divide='ignore', invalid='ignore'):
     hCaloPosNormU = np.divide(counts_weighted, counts_unweighted)
     hCaloPosNormU[~np.isfinite(hCaloPosNormU)] = 0  # set inf/NaN to 0
 
+    
+# -----------------------------------------------------------------------------
 # Plotting figures, disabling most of them but will leave in code for debugging
+# -----------------------------------------------------------------------------
+
 # plt.figure(figsize=(8, 6))
 # plt.imshow(
 #     hCaloPos.view().T,
@@ -100,22 +97,6 @@ with np.errstate(divide='ignore', invalid='ignore'):
 # plt.savefig("hCaloPos.png", bbox_inches="tight", dpi=150)
 # plt.close()
 
-# # Plot and save hExitPos
-# plt.figure(figsize=(8, 6))
-# plt.imshow(
-#     hExitPos.view().T,
-#     origin="lower",
-#     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
-#     aspect="auto"
-# )
-# plt.xlabel("xexit")
-# plt.ylabel("yexit")
-# plt.title("2D Histogram: yexit vs xexit")
-# plt.colorbar(label="Counts")
-# plt.savefig("hExitPos.png", bbox_inches="tight", dpi=150)
-# plt.close()
-
-# # Plotting and saving hCaloPosWtU
 # plt.figure(figsize=(8, 6))
 # plt.imshow(
 #     hCaloPosWtU.view().T,
@@ -130,21 +111,58 @@ with np.errstate(divide='ignore', invalid='ignore'):
 # plt.savefig("hCaloPosWtU.png", bbox_inches="tight", dpi=150)
 # plt.close()
 
-# Plotting and saving hCaloPosNormU
+# -----------------------------------------------------------------------------
+# Plotting
+# -----------------------------------------------------------------------------
+
+# Setting up custom color mapping
+data = hCaloPosNormU.view()
+vmin, vmax = np.nanmin(data), np.nanmax(data)
+norm = mplcolors.Normalize(vmin=vmin, vmax=vmax)
+
+mid = norm(1.0)
+
+cmap = mplcolors.LinearSegmentedColormap.from_list(
+    "custom_cmap",
+    [(0.0, "white"), (mid, "navy"), (0.5, "darkorange"), (1.0, "red")]
+)
+
+# Plotting normalized e/p per track
 plt.figure(figsize=(8, 6))
 plt.imshow(
     hCaloPosNormU.view().T,
     origin="lower",
     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
     aspect="auto",
-    cmap = "afmhot_r"
+    cmap = cmap
 )
-plt.xlabel("xnorm")
-plt.ylabel("ynorm")
-plt.title("ynorm v xnorm")
-plt.colorbar(label="Counts")
-plt.savefig("hCaloPosNormU.png", bbox_inches="tight", dpi=150)
+fig, ax = plt.subplots(figsize=(8, 6))
+
+im = ax.imshow(
+    hCaloPosNormU.view().T,
+    origin="lower",
+    extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
+    aspect="auto",
+    cmap=cmap
+)
+
+ax.set_title(f"Run {runnum} Normalized E/p per Track at SHMS Calorimeter")
+fig.colorbar(im, ax=ax, label="Counts")
+
+# Plotting the grid
+numrows, numcols = 16, 14
+blockspacing = 9
+
+startrow = -blockspacing * numrows / 2.0
+startcol = -blockspacing * numcols / 2.0
+
+for i in range(numrows + 1):
+    y = startrow + i * blockspacing
+    ax.hlines(y, startcol, startcol + blockspacing * numcols, colors='silver', linewidth=1.0, alpha = 0.6)
+
+for i in range(numcols + 1):
+    x = startcol + i * blockspacing
+    ax.vlines(x, startrow, startrow + blockspacing * numrows, colors='silver', linewidth=1.0, alpha = 0.6)
+
+plt.savefig(f"{file_type}/{file_type}_run_{runnum}_etottracknorm_at_cal.png", bbox_inches="tight", dpi=300)
 plt.close()
-
-
-

@@ -169,45 +169,6 @@ x_indices = np.arange(len(df))
 ps3_mask = (parsed_ps3 != -999) & (parsed_ps3 != -1)
 ps4_mask = ~ps3_mask
 
-# plt.figure(figsize=(12,6))
-
-# # -- Plotting Ps3 electrons
-# plt.scatter(x_indices[elec_mask & ps3_mask], df["yield"][elec_mask & ps3_mask],
-#             color='red', s=10, marker='o', label='Ps3 HMS 3/4 elec')
-
-# # -- Plotting Ps4 electrons
-# plt.scatter(x_indices[elec_mask & ps4_mask], df["yield"][elec_mask & ps4_mask],
-#             color='blue', s=10, marker='o', label='Ps4 HMS ELREAL elec')
-
-# # -- Plotting Ps3 positrons
-# plt.scatter(x_indices[pos_mask & ps3_mask], df["yield"][pos_mask & ps3_mask],
-#             color='red', s=10, marker='x', label='Ps3 HMS 3/4 pos')
-
-# # -- Plotting Ps4 positrons
-# plt.scatter(x_indices[pos_mask & ps4_mask], df["yield"][pos_mask & ps4_mask],
-#             color='blue', s=10, marker='x', label='Ps4 HMS ELREAL pos')
-
-# plt.errorbar(x_indices, df["yield"], yerr=df["yield_err"], fmt='none', ecolor='black')
-
-# plt.xticks(x_indices, df["runnum"], rotation=45)
-# plt.xlabel("Run Number")
-# plt.ylabel("Delta Yield per mC")
-# plt.title(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields")
-# plt.grid(True, linestyle='--', alpha=0.7)
-
-# legend_handles = [
-#     Line2D([0], [0], color='red', marker='o', linestyle='None', markersize=6, label='Ps3 HMS 3/4 elec'),
-#     Line2D([0], [0], color='blue', marker='o', linestyle='None', markersize=6, label='Ps4 HMS ELREAL elec'),
-#     Line2D([0], [0], color='red', marker='x', linestyle='None', markersize=6, label='Ps3 HMS 3/4 pos'),
-#     Line2D([0], [0], color='blue', marker='x', linestyle='None', markersize=6, label='Ps4 HMS ELREAL pos'),
-#     Line2D([0], [0], color='black', marker='_', linestyle='-', markersize=10, label='Error bar')
-# ]
-
-# plt.legend(handles=legend_handles)
-
-# plt.tight_layout()
-# plt.savefig(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields.png")
-
 plt.figure(figsize=(12,6))
 
 # Ps3 electrons
@@ -240,16 +201,6 @@ plt.ylabel("Delta Yield per mC", fontsize = 12)
 plt.title(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields", fontsize = 14)
 plt.grid(True, linestyle='--', color = 'gray', alpha=0.3)
 plt.margins(y = 0.1)
-
-# legend_handles = [
-#     Line2D([0], [0], color='red', marker='o', linestyle='None', markersize=6, label='Ps3 HMS 3/4 elec'),
-#     Line2D([0], [0], color='blue', marker='o', linestyle='None', markersize=6, label='Ps4 HMS ELREAL elec'),
-#     Line2D([0], [0], color='red', marker='x', linestyle='None', markersize=6, label='Ps3 HMS 3/4 pos'),
-#     Line2D([0], [0], color='blue', marker='x', linestyle='None', markersize=6, label='Ps4 HMS ELREAL pos'),
-#     Line2D([0], [0], color='black', marker='_', linestyle='-', markersize=10, label='Error bar')
-# ]
-
-# plt.legend(frameon = True, handles=legend_handles, fontsize = 10)
 
 plt.legend(frameon = True, fontsize = 10)
 
