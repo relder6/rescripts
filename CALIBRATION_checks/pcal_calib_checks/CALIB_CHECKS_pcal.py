@@ -16,7 +16,7 @@ runnum = input(f"Input the run number you wish to analyze:")
 # Directory information, modify as needed
 root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
 coin_pattern = f"coin_replay_production_{runnum}_-1.root"
-shms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
+shms_pattern = f"shms_coin_replay_production_{runnum}_-1.root"
 
 d_calo_fp = 292.64 # distance from focal plane to calorimeter face
 
@@ -55,6 +55,14 @@ xcalo = ((df_cut["P.dc.x_fp"]) + (df_cut["P.dc.xp_fp"])*d_calo_fp)
 ycalo = ((df_cut["P.dc.y_fp"]) + (df_cut["P.dc.yp_fp"])*d_calo_fp)
 
 weight = df_cut["P.cal.etottracknorm"]
+
+finite_mask = np.isfinite(xcalo) & np.isfinite(ycalo) & np.isfinite(weight)
+
+xcalo = xcalo[finite_mask]
+
+ycalo = ycalo[finite_mask]
+
+weight = weight[finite_mask]
 
 xbins, ybins = 200, 200
 
@@ -113,81 +121,136 @@ with np.errstate(divide='ignore', invalid='ignore'):
 # plt.close()
 
 # -----------------------------------------------------------------------------
-# Plotting
+# Getting the figure ready to place both plots
 # -----------------------------------------------------------------------------
 
-# Setting up custom color mapping
-data = hCaloPosNormU.view()
-vmin, vmax = np.nanmin(data), np.nanmax(data)
-norm = mplcolors.Normalize(vmin=vmin, vmax=vmax)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (14, 6), constrained_layout = True)
+fig.suptitle(f"{file_type} Run {runnum}", fontsize=16, fontweight="bold")
 
-mid = norm(1.0)
+# -----------------------------------------------------------------------------
+# Plotting normalized e/p per track at calorimeter
+# -----------------------------------------------------------------------------
+
+# Color mapping stuff
+data = hCaloPosNormU.view()
+vmin = 0
+vmax_candidate = np.nanmax(data)
+vmax = vmax_candidate if vmax_candidate > vmin else vmin + 1  # avoid zero range
+
+def safe_norm_pos(val, vmin, vmax, prev_pos):
+    if vmax == vmin:
+        return 1.0
+    pos = (val - vmin) / (vmax - vmin)
+    pos = np.clip(pos, 0.0, 1.0)
+    return max(pos, prev_pos)
+
+pos_0 = 0.0
+pos_1 = safe_norm_pos(1, vmin, vmax, pos_0)
+pos_2 = safe_norm_pos(2, vmin, vmax, pos_1)
+pos_max = 1.0
 
 cmap = mplcolors.LinearSegmentedColormap.from_list(
     "custom_cmap",
-    [(0.0, "white"), (mid, "navy"), (0.5, "darkorange"), (1.0, "red")]
+    [
+        (pos_0, "white"),
+        (pos_1, "navy"),
+        (pos_2, "orange"),
+        (pos_max, "red")
+    ]
 )
 
-# Plotting normalized e/p per track
-plt.figure(figsize=(8, 6))
-plt.imshow(
-    hCaloPosNormU.view().T,
+norm = mplcolors.Normalize(vmin=vmin, vmax=vmax)
+
+im = ax1.imshow(
+    data.T,
     origin="lower",
     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
     aspect="auto",
-    cmap = cmap
-)
-fig, ax = plt.subplots(figsize=(8, 6))
-
-im = ax.imshow(
-    hCaloPosNormU.view().T,
-    origin="lower",
-    extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
-    aspect="auto",
-    cmap= cmap
+    cmap=cmap,
+    norm=norm
 )
 
-ax.set_title(f"Run {runnum} Normalized E/p per Track at SHMS Calorimeter")
+ax1.set_title(f"Normalized E/p per Track at Calorimeter", fontsize=14)
 
-imvmin, imvmax = im.get_clim()
-cbar = fig.colorbar(im, ax=ax, pad = 0.01, format='%.1f')
-cbar.ax.tick_params(labelsize=8)  # Consistent font size and spacing
+cbar = fig.colorbar(im, ax=ax1, format='%.1f', pad=0.01)
+
+# Set ticks dynamically from 0 to floor(vmax)
+ticks = np.arange(0, int(np.floor(vmax)) + 0.5, 1)
+cbar.set_ticks(ticks)
+cbar.set_ticklabels([f"{tick:.1f}" for tick in ticks])
+cbar.ax.tick_params(labelsize=8)
 
 
-# Plotting the grid
-numrows, numcols = 16, 14
-blockspacing = 9
+ax1.set_title(f"Normalized E/p per Track at Calorimeter", fontsize = 14)
 
-startrow = -blockspacing * numrows / 2.0
-startcol = -blockspacing * numcols / 2.0
-
+# Now adding the grid overlay,
+numrows, numcols, blockspacing = 16, 14, 9
+startrow, startcol = -blockspacing * numrows / 2.0, -blockspacing * numcols / 2.0
 for i in range(numrows + 1):
     y = startrow + i * blockspacing
-    ax.hlines(y, startcol, startcol + blockspacing * numcols, colors='silver', linewidth=1.0, alpha = 0.6)
-
+    ax1.hlines(y, startcol, startcol + blockspacing * numcols, colors='silver', linewidth=1.0, alpha=0.6)
 for i in range(numcols + 1):
     x = startcol + i * blockspacing
-    ax.vlines(x, startrow, startrow + blockspacing * numrows, colors='silver', linewidth=1.0, alpha = 0.6)
+    ax1.vlines(x, startrow, startrow + blockspacing * numrows, colors='silver', linewidth=1.0, alpha=0.6)
 
-plt.savefig(f"{file_type}/{file_type}_run_{runnum}_etottracknorm_at_cal.png", bbox_inches="tight", dpi=300)
-plt.close()
 
-# Plotting e/p
+# plt.figure(figsize=(8, 6))
+# plt.imshow(
+#     hCaloPosNormU.view().T,
+#     origin="lower",
+#     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
+#     aspect="auto",
+#     cmap = cmap
+# )
+# fig, ax = plt.subplots(figsize=(8, 6))
+
+# im = ax.imshow(
+#     hCaloPosNormU.view().T,
+#     origin="lower",
+#     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
+#     aspect="auto",
+#     cmap= cmap
+# )
+
+# ax.set_title(f"Run {runnum} Normalized E/p per Track at SHMS Calorimeter")
+
+# imvmin, imvmax = im.get_clim()
+# cbar = fig.colorbar(im, ax=ax, pad = 0.01, format='%.1f')
+# cbar.ax.tick_params(labelsize=8)  # Consistent font size and spacing
+
+# # Plotting the grid
+# numrows, numcols = 16, 14
+# blockspacing = 9
+
+# startrow = -blockspacing * numrows / 2.0
+# startcol = -blockspacing * numcols / 2.0
+
+# for i in range(numrows + 1):
+#     y = startrow + i * blockspacing
+#     ax.hlines(y, startcol, startcol + blockspacing * numcols, colors='silver', linewidth=1.0, alpha = 0.6)
+
+# for i in range(numcols + 1):
+#     x = startcol + i * blockspacing
+#     ax.vlines(x, startrow, startrow + blockspacing * numrows, colors='silver', linewidth=1.0, alpha = 0.6)
+
+# plt.savefig(f"{file_type}/{file_type}_run_{runnum}_etottracknorm_at_cal.png", bbox_inches="tight", dpi=300)
+# plt.close()
+
+# -----------------------------------------------------------------------------
+# Plotting fitted distribution of e/p
+# -----------------------------------------------------------------------------
 
 bin_min, bin_max, bin_num = 0, 2, 200
 data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
-
 counts, bin_edges = np.histogram(df_cut["P.cal.etottracknorm"], bins=data_bins)
 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-# Fitting range
 fit_min, fit_max = 0.9, 1.1
 fit_mask = (bin_centers >= fit_min) & (bin_centers <= fit_max)
 
 x_fit = bin_centers[fit_mask]
 y_fit = counts[fit_mask]
 
-# Mask out zero bins because log-likelihood or fit weighting can fail
 nonzero = y_fit > 0
 x_fit = x_fit[nonzero]
 y_fit = y_fit[nonzero]
@@ -203,18 +266,88 @@ def gaussian(x, amp, mean, sigma):
 from scipy.optimize import curve_fit
 popt, _ = curve_fit(gaussian, x_fit, y_fit, p0=[amp_guess, mean_guess, sigma_guess])
 
-plt.figure()
-plt.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='e/p')
-plt.xlim(bin_min, bin_max)
-plt.xlabel("E/p", fontsize=12)
-plt.ylabel("Counts", fontsize=12)
-plt.title(f"Run {runnum} Fitted E/p", fontsize=16)
-plt.grid(alpha=0.5)
+# Extracting here the fit results
+amp_fit, mean_fit, sigma_fit = popt
 
-# Plot the gaussian fit
+# Now plotting to the second pad
+ax2.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
 x_plot = np.linspace(fit_min, fit_max, 500)
-plt.plot(x_plot, gaussian(x_plot, *popt), 'b-', label='Gaussian fit')
+ax2.plot(x_plot, gaussian(x_plot, *popt), color = 'navy', label='Gaussian fit')
 
-plt.legend()
-plt.tight_layout()
-plt.savefig("Testing.png")
+ax2.set_xlim(bin_min, bin_max)
+ax2.set_xlabel("E/p", fontsize=12)
+ax2.set_ylabel("Counts", fontsize=12)
+ax2.set_title(f"Fitted E/p", fontsize=14)
+ax2.grid(alpha=0.5)
+ax2.legend()
+
+ax2.text(
+    0.05, 0.95,
+    f"Mean = {mean_fit:.4f}\nSigma = {sigma_fit:.4f}",
+    transform=ax2.transAxes,
+    verticalalignment='top',
+    fontsize=10,
+    bbox=dict(facecolor='white', alpha=0.7, edgecolor='black')
+)
+# --------------------------------------------------------------------------
+# Writing the fit stats to tsv file
+# --------------------------------------------------------------------------
+# output_file = "FIT_results.txt"
+
+# new_line = f"{runnum}\t{mean_fit:.6f}\t{sigma_fit:.6f}\n"
+
+# if os.path.exists(output_tsv):
+#     with open(output_tsv, "r") as infile:
+#         lines = infile.readlines()
+
+#     header = lines[0]
+#     fit_result_lines = lines[1:]
+
+#     for i, line in enumerate(fit_result_lines):
+#         if line.strip() = "":
+#             continue
+#         parts = line.strip().split("\t")
+#         if parts[0] == str(runnum):
+#             data_lines[i] = new_line # This replaces the fit result line if the script is run several times over. So the fit result in the tsv is most accurate to when the script was run.
+#             break
+#         else:
+#             data_lines.append(new_line) # This appends a new line if that run number was not assessed previously.
+
+#         with open(output_tsv, "w") as outfile:
+#             outfile.write(header)
+#             f.writelines(data_lines)
+# else:
+#     print(f"WARNING: Output file {output_file} does not exist!  Exiting.")
+#     sys.exit(1)
+
+# --------------------------------------------------------------------------
+# Save the combined figure
+# --------------------------------------------------------------------------
+plt.savefig(f"{file_type}/{file_type}_run_{runnum}_pcal.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+print(f"{runnum}\t{mean_fit:.6f}\t{sigma_fit:.6f}")
+# plt.figure()
+# plt.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='e/p')
+# plt.xlim(bin_min, bin_max)
+# plt.xlabel("E/p", fontsize=12)
+# plt.ylabel("Counts", fontsize=12)
+# plt.title(f"Run {runnum} Fitted E/p", fontsize=16)
+# plt.grid(alpha=0.5)
+
+# x_plot = np.linspace(fit_min, fit_max, 500)
+# plt.plot(x_plot, gaussian(x_plot, *popt), 'b-', label='Gaussian fit')
+
+# plt.text(
+#     0.05, 0.95,
+#     f"Mean = {mean_fit:.4f}\nSigma = {sigma_fit:.4f}",
+#     transform=plt.gca().transAxes,
+#     verticalalignment='top',
+#     fontsize=10,
+#     bbox=dict(facecolor='white', alpha=0.7, edgecolor='none')
+# )
+
+
+# plt.legend()
+# plt.tight_layout()
+# plt.savefig("Testing.png")
