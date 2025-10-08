@@ -30,8 +30,8 @@ beam_charge_milliC_pos = beam_charge_pos / 1000
 # File paths
 # -----------------------------------------------------
 
-directory_filepath = "/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
-hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
+# directory_filepath = "/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
+# hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
 
 #electron_file = f"/w/hallc-scshelf2102/c-rsidis/relder/ROOTfiles/hms_coin_replay_production_{run_number_electron}_-1.root"
 electron_file = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles/hms_coin_replay_production_{run_number_electron}_-1.root"
