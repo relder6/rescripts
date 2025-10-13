@@ -9,6 +9,7 @@ CALIB_CHECKS_pcal.py can be used for a single run,
 
 RUN_ALL_pcal.py can be used to loop over many runs,
 [terminal] ./RUN_ALL_pcal.py
+Running this script will produce FIT_pcal_results.dat.  This table is read in and processed further in the next script.
 
 PLOT_pcal_fit.py can then be used to produce e/p vs run number plots,
 [terminal] ./PLOT_pcal_fit.py

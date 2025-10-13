@@ -5,9 +5,9 @@ from tqdm import tqdm
 import os
 import sys
 
-script_path = "CALIB_CHECKS_pcal.py"
+script_path = "CALIB_CHECKS_hcal.py"
 fit_results = []
-fit_results_filepath = "FIT_pcal_results.dat"
+fit_results_filepath = "FIT_hcal_results.dat"
 
 # --------------------------------------------------------------------------
 # Checking that fit results file exists

@@ -4,12 +4,12 @@ import os, re
 import pandas as pd
 import matplotlib.pyplot as plt
 
-fit_results_filepath = "FIT_pcal_results.dat"
+fit_results_filepath = "FIT_hcal_results.dat"
 auxfiles_runlist_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
-processed_fit_filepath = "FIT_pcal_results_processed.dat"
+processed_fit_filepath = "FIT_hcal_results_processed.dat"
 
 runnums = []
-shms_p = []
+hms_p = []
 runtypes = []
 
 
@@ -54,14 +54,14 @@ with open(auxfiles_runlist_filepath, "r") as infile:
         runnum, momentum, run_type = extract_parts(line)
         if runnum is not None and momentum is not None and run_type is not None:
             runnums.append(runnum)
-            shms_p.append(momentum)
+            hms_p.append(momentum)
             runtypes.append(run_type)
 
-run_to_mom = dict(zip(runnums, shms_p))
+run_to_mom = dict(zip(runnums, hms_p))
 run_to_type = dict(zip(runnums, runtypes))
 
 with open(fit_results_filepath, "r") as infile, open(processed_fit_filepath, "w") as outfile:
-    outfile.write("#runnum\tfit_mean\tfit_error\tshms_p\tfiletype\n") # Writing the header
+    outfile.write("#runnum\tfit_mean\tfit_error\thms_p\tfiletype\n") # Writing the header
     for line in infile:
         if line.lstrip().startswith("#"): # And skipping here the header from the infile
             continue
@@ -121,8 +121,8 @@ plt.axhline(1.0, color='navy', linestyle='--', linewidth=1.2, label='y = 1')
 
 plt.xlabel("Run Number", fontsize=13)
 plt.ylabel("Fit Mean", fontsize=13)
-plt.title("SHMS Calorimeter Fitted E/p vs Run Number", fontsize=15)
+plt.title("HMS Calorimeter Fitted E/p vs Run Number", fontsize=15)
 plt.legend(title="Run Type", fontsize=10)
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.tight_layout()
-plt.savefig("pcal_calib_etottracknorm_vs_runnum.png", dpi = 300)
+plt.savefig("hcal_calib_etottracknorm_vs_runnum.png", dpi = 300)
