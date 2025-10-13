@@ -4,9 +4,9 @@ import os, re
 import pandas as pd
 import matplotlib.pyplot as plt
 
-fit_results_filepath = "FIT_results.dat"
+fit_results_filepath = "FIT_pdc_results.dat"
 auxfiles_runlist_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
-processed_fit_filepath = "FIT_results_processed.dat"
+processed_fit_filepath = "FIT_pdc_results_processed.dat"
 
 runnums = []
 shms_p = []

@@ -193,49 +193,6 @@ for i in range(numcols + 1):
     x = startcol + i * blockspacing
     ax1.vlines(x, startrow, startrow + blockspacing * numrows, colors='silver', linewidth=1.0, alpha=0.6)
 
-
-# plt.figure(figsize=(8, 6))
-# plt.imshow(
-#     hCaloPosNormU.view().T,
-#     origin="lower",
-#     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
-#     aspect="auto",
-#     cmap = cmap
-# )
-# fig, ax = plt.subplots(figsize=(8, 6))
-
-# im = ax.imshow(
-#     hCaloPosNormU.view().T,
-#     origin="lower",
-#     extent=[xrange[0], xrange[1], yrange[0], yrange[1]],
-#     aspect="auto",
-#     cmap= cmap
-# )
-
-# ax.set_title(f"Run {runnum} Normalized E/p per Track at SHMS Calorimeter")
-
-# imvmin, imvmax = im.get_clim()
-# cbar = fig.colorbar(im, ax=ax, pad = 0.01, format='%.1f')
-# cbar.ax.tick_params(labelsize=8)  # Consistent font size and spacing
-
-# # Plotting the grid
-# numrows, numcols = 16, 14
-# blockspacing = 9
-
-# startrow = -blockspacing * numrows / 2.0
-# startcol = -blockspacing * numcols / 2.0
-
-# for i in range(numrows + 1):
-#     y = startrow + i * blockspacing
-#     ax.hlines(y, startcol, startcol + blockspacing * numcols, colors='silver', linewidth=1.0, alpha = 0.6)
-
-# for i in range(numcols + 1):
-#     x = startcol + i * blockspacing
-#     ax.vlines(x, startrow, startrow + blockspacing * numrows, colors='silver', linewidth=1.0, alpha = 0.6)
-
-# plt.savefig(f"{file_type}/{file_type}_run_{runnum}_etottracknorm_at_cal.png", bbox_inches="tight", dpi=300)
-# plt.close()
-
 # -----------------------------------------------------------------------------
 # Plotting fitted distribution of e/p
 # -----------------------------------------------------------------------------
@@ -289,65 +246,13 @@ ax2.text(
     fontsize=10,
     bbox=dict(facecolor='white', alpha=0.7, edgecolor='black')
 )
-# --------------------------------------------------------------------------
-# Writing the fit stats to tsv file
-# --------------------------------------------------------------------------
-# output_file = "FIT_results.txt"
-
-# new_line = f"{runnum}\t{mean_fit:.6f}\t{sigma_fit:.6f}\n"
-
-# if os.path.exists(output_tsv):
-#     with open(output_tsv, "r") as infile:
-#         lines = infile.readlines()
-
-#     header = lines[0]
-#     fit_result_lines = lines[1:]
-
-#     for i, line in enumerate(fit_result_lines):
-#         if line.strip() = "":
-#             continue
-#         parts = line.strip().split("\t")
-#         if parts[0] == str(runnum):
-#             data_lines[i] = new_line # This replaces the fit result line if the script is run several times over. So the fit result in the tsv is most accurate to when the script was run.
-#             break
-#         else:
-#             data_lines.append(new_line) # This appends a new line if that run number was not assessed previously.
-
-#         with open(output_tsv, "w") as outfile:
-#             outfile.write(header)
-#             f.writelines(data_lines)
-# else:
-#     print(f"WARNING: Output file {output_file} does not exist!  Exiting.")
-#     sys.exit(1)
 
 # --------------------------------------------------------------------------
 # Save the combined figure
 # --------------------------------------------------------------------------
+
 plt.savefig(f"{file_type}/{file_type}_run_{runnum}_pcal.png", dpi=300, bbox_inches="tight")
 plt.close()
 
-print(f"{runnum}\t{mean_fit:.6f}\t{sigma_fit:.6f}")
-# plt.figure()
-# plt.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='e/p')
-# plt.xlim(bin_min, bin_max)
-# plt.xlabel("E/p", fontsize=12)
-# plt.ylabel("Counts", fontsize=12)
-# plt.title(f"Run {runnum} Fitted E/p", fontsize=16)
-# plt.grid(alpha=0.5)
+print(f"{runnum}\t{mean_fit:.6f}\t{sigma_fit:.6f}") # Don't uncomment this line!  This helps for PLOT_... script.
 
-# x_plot = np.linspace(fit_min, fit_max, 500)
-# plt.plot(x_plot, gaussian(x_plot, *popt), 'b-', label='Gaussian fit')
-
-# plt.text(
-#     0.05, 0.95,
-#     f"Mean = {mean_fit:.4f}\nSigma = {sigma_fit:.4f}",
-#     transform=plt.gca().transAxes,
-#     verticalalignment='top',
-#     fontsize=10,
-#     bbox=dict(facecolor='white', alpha=0.7, edgecolor='none')
-# )
-
-
-# plt.legend()
-# plt.tight_layout()
-# plt.savefig("Testing.png")
