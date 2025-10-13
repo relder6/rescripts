@@ -122,7 +122,7 @@ with open(output_runnums_filepath, "r") as infile:
         
 with open(output_filepath, "w") as outfile:
     # Write header
-    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tTrackEf\tWeight\t# Comments\n")
+    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tTrackEf\tWeight\tnu\tQ2\tepsilon\t# Comments\n")
     
     for line in filtered_lines:
         parts = re.split(r'\s+', line.strip())
@@ -193,10 +193,13 @@ with open(output_filepath, "w") as outfile:
         if livetime_unformatted > 1:
             livetime_unformatted = 1
         livetime = float(livetime_unformatted)
-        weight = 1000 * float(ps) / ((float(livetime) * float(bcm2cutch) * float(trackeff)))
+        weight = float(ps) / ((float(livetime) * float(trackeff)))
+        nu = float(abs(ebeam)) - float(abs(hms_p))
+        Q2 = 4 * float(ebeam) * float(abs(hms_p)) * (np.sin(np.deg2rad(hms_th)/2))**2
+        epsilon = 1 / (1 + 2 * (1 + (nu**2 / Q2)) * np.tan(np.deg2rad(hms_th) / 2)**2)
         # Composing the tsv line
-        # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, comment ])
-        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", comment]))
+        # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, nu, Q2,  comment ])
+        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", comment]))
 
         outfile.write(tsv_line + "\n")
 
