@@ -8,19 +8,19 @@ ROOT.gErrorIgnoreLevel = ROOT.kError
 
 runnum = input("Input desired run number.")
 
-root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
+root_directory = f"/cache/hallc/c-rsidis/analysis/replays/pass0"
 # coin_pattern = f"coin_replay_production_{runnum}_-1.root"
 # shms_pattern = f"shms_coin_replay_production_{runnum}_-1.root"
 hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
 
 input_filepath = f"{root_directory}/{hms_pattern}"
 
-output_filepath = f"hms_skim_coin_replay_production_{runnum}_-1.root"
+output_filepath = f"/work/hallc/c-rsidis/relder/pass0/reSKIM/skimmed_hms_coin_replay_production_{runnum}_-1.root"
 
 selected_branches = [
-    "H.gtr.dp", "H.cal.etottracknorm", "H.gtr.ph", "H.gtr.th",
-    "H.gtr.x", "H.gtr.y", "H.kin.Q2", "H.kin.x_bj",
-    "H.kin.W", "H.cer.npeSum"
+    "H.gtr.x", "H.gtr.y", "H.gtr.dp", "H.gtr.p", "H.gtr.ph", "H.gtr.th", "H.gtr.beta", "H.gtr.index",
+    "H.dc.x_fp", "H.dc.y_fp", "H.dc.xp_fp", "H.dc.yp_fp", "H.cer.npeSum", "H.cal.etottracknorm",
+    "H.react.x", "H.react.y", "H.react.z", "H.kin.Q2", "H.kin.x_bj", "H.kin.W"
 ]
 
 infile = ROOT.TFile(input_filepath, "READ")

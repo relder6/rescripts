@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 
 import os, re
+import numpy as np
+import csv
+
+# =====================================================================
+# Defining paths here
+# =====================================================================
 
 input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
-# report_filepath = "/net/cdaq/cdaql3data/cdaq/hallc-online-rsidis2025/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
-report_filepath = "/work/hallc/c-rsidis/cmorean/replay_pass0a/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
+report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
+run_info_filepath = "/work/hallc/c-rsidis/relder/pass0/run_info_pass0.csv"
 
+skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
 
-# -- User inputs and input processing--
+# =====================================================================
+# Handling user inputs
+# =====================================================================
 
 selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
 if not selected_type:
@@ -27,9 +36,9 @@ if not beam_prefix:
 # selected_angle = input("Enter the desired HMS angle (present options: ): ").strip() #  This is kind of pointless for HMSDIS, only one setting... commenting out
 
 selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
-selected_target_shortcut_to_target_variable = {"al":"aluminum","al13":"aluminum","aluminum":"aluminum",
-                                               "c":"carbon","c12":"carbon","carbon":"carbon",
-                                               "cu":"copper","cu29":"copper","copper":"copper",
+selected_target_shortcut_to_target_variable = {"al":"al","al13":"al","aluminum":"al",
+                                               "c":"c","c12":"c","carbon":"c",
+                                               "cu":"cu","cu29":"cu","copper":"cu",
                                                "opt1":"optics1","optics1":"optics1",
                                                "opt2":"optics2","optics2":"optics2",
                                                "d2":"ld2","ld2":"ld2",
@@ -44,11 +53,13 @@ if not selected_target_shortname:
 
 output_filepath = f"{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
 
+# =====================================================================
+# Reading auxfiles runlist, filtering and extracting lines
+# =====================================================================
+
 with open(input_filepath, "r") as infile:
     lines = infile.readlines()
 
-
-# header_lines = [] # Not going to bother saving the header lines from the runlist.
 run_lines = []
 
 for line in lines:
@@ -60,56 +71,36 @@ for line in lines:
         continue
     run_lines.append(line)
 
-def extract_fields(line):
-    parts = re.split(r'\s+', line.strip())
-    ebeam = ""
-    target_type = ""
-    run_type = ""
-
-    for part in parts:
-        if re.match(r'^\d+\.\d+$', part): # looking for the first float in the line
-            ebeam = part
-            break
-
-    run_types = ["hole", "optics", "heep", "hee", "hmsdis", "shmsdis", "pi-sidis", "pi+sidis", "junk"] # defining the known run types
-    for part in parts:
-        if part.lower() in run_types:
-            run_type = part.lower()
-            break
-
-    targets = ["lh2", "carbon", "copper", "aluminum", "ld2", "dummy", "c-hole"] # defining the known targets
-    for part in parts:
-        if part.lower() in targets:
-            target_type = part.lower()
-            break
-
-    return ebeam, target_type, run_type
-
-
 filtered_lines = []
 
-# debug_output_filepath = "debug_extract_fields.txt"
-# debug_outfile = open(debug_output_filepath, "w")
-
-# debug_output_filepath = "debug_extract_fields.txt"
-# with open(debug_output_filepath, "w") as debug_outfile:
-#     for line in run_lines:
-#         ebeam, target_type, run_type = extract_fields(line)
-#         debug_outfile.write(f"ebeam: {ebeam} target: {target_type} run_type: {run_type}\n")
-
 for line in run_lines:
-    ebeam, target_type, run_type = extract_fields(line)
+    parts = re.split(r'\s+', line.strip())
+    ebeam, target_type, run_type = "", "", ""
+    for part in parts:
+        if re.match(r'^\d+\.\d+$', part):
+            ebeam = part
+            break
+    for part in parts:
+        if part.lower() in ["hole", "optics", "heep", "hee", "hmsdis", "shmsdis", "pi-sidis", "pi+sidis", "junk"]:
+            run_type = part.lower()
+            break
+    for part in parts:
+        if part.lower() in ["lh2", "c", "cu", "al", "ld2", "dummy", "hole"]:
+            target_type = part.lower()
+            break
+    runnum = int(parts[0])
     beam_match = ebeam.startswith(beam_prefix)
-    if (
-            selected_type == run_type.strip().lower() and
-            selected_target_shortname == target_type.strip().lower() and
-            beam_match
-    ):
-        filtered_lines.append(line)
 
-# -- Adding function to make csv of runnums.  Then, reading it in, so runnums can be used below.
+    if (selected_type == run_type.strip().lower() and
+        selected_target_shortname.lower() == target_type.strip().lower() and
+        beam_match and runnum not in skip_runnums):
+        filtered_lines.append(line)
         
 output_runnums_filepath = f"RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
+
+# =====================================================================
+# Writing runnums to csv
+# =====================================================================
 
 with open(output_runnums_filepath, "w") as outfile:
     runnums = [re.split(r'\s+',line.strip())[0] for line in filtered_lines]
@@ -118,11 +109,29 @@ with open(output_runnums_filepath, "w") as outfile:
 with open(output_runnums_filepath, "r") as infile:
     runnums = infile.read().strip().split(",")
 
-# -- Function to write the output file
+# =====================================================================
+# Reading in fan speed correction
+# =====================================================================
+
+runinfo_lookup = {}
+if os.path.exists(run_info_filepath):
+    with open(run_info_filepath, "r") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            try:
+                runnum = int(row["run"])
+                corr_coeff = row.get("corr_coeff", "N/A")
+                runinfo_lookup[runnum] = corr_coeff
+            except (ValueError, KeyError):
+                continue
+
+# =====================================================================
+# Reading in report files and compiling the tsv
+# =====================================================================
         
 with open(output_filepath, "w") as outfile:
     # Write header
-    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tTrackEf\tWeight\tnu\tQ2\tepsilon\t# Comments\n")
+    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\tcorr_coeff\t# Comments\n")
     
     for line in filtered_lines:
         parts = re.split(r'\s+', line.strip())
@@ -194,12 +203,16 @@ with open(output_filepath, "w") as outfile:
             livetime_unformatted = 1
         livetime = float(livetime_unformatted)
         weight = float(ps) / ((float(livetime) * float(trackeff)))
-        nu = float(abs(ebeam)) - float(abs(hms_p))
-        Q2 = 4 * float(ebeam) * float(abs(hms_p)) * (np.sin(np.deg2rad(hms_th)/2))**2
-        epsilon = 1 / (1 + 2 * (1 + (nu**2 / Q2)) * np.tan(np.deg2rad(hms_th) / 2)**2)
+        nu = abs(float(ebeam)) - abs(float(hms_p))
+        hms_th_float = float(hms_th)
+        hms_th_rad = np.deg2rad(hms_th_float)
+        Q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
+        epsilon = 1 / (1 + 2 * (1 + (nu**2 / Q2)) * np.tan(hms_th_rad/ 2))**2
+        runnum_int = int(runnum)
+        runinfo_val = runinfo_lookup.get(runnum_int, "N/A")
         # Composing the tsv line
         # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, nu, Q2,  comment ])
-        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", comment]))
+        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", runinfo_val, comment]))
 
         outfile.write(tsv_line + "\n")
 

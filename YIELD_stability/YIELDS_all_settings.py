@@ -8,11 +8,12 @@ targets = ["al", "c", "cu", "ld2", "lh2", "dummy"]
 
 script_path = "YIELDS_by_setting.py"
 
-
 for run_type in run_types:
     for beam_pass in beam_passes:
         for target in targets:
+            print("**************************************************************************************")
             print(f"Calling script with run_type = {run_type}, beam_pass = {beam_pass}, target = {target}")
+            print("**************************************************************************************")
             
             try:
                 input_str = f"{run_type}\n{beam_pass}\n{target}\n"
@@ -23,10 +24,17 @@ for run_type in run_types:
                     stderr=subprocess.PIPE,
                     check=True  # will raise CalledProcessError on non-zero exit code
                 )
-                print(result.stdout.decode())
+                if result.stdout:
+                    print(result.stdout.decode())
+                if result.stderr:
+                    print(result.stderr.decode())
                 
             except subprocess.CalledProcessError as e:
+                if e.stdout:
+                    print(e.stdout.decode())
+                if e.stderr:
+                    print(e.stderr.decode())
                 print(f"Error running script for {run_type}, {beam_pass}, {target}: {e}")
-                # Break out of the innermost loop and go to the next beam_pass or run_type
-                break  # or 'continue' if you want to try next target for same run_type and beam_pass
+                continue
+
 
