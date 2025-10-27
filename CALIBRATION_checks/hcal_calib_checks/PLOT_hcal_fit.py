@@ -5,7 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 fit_results_filepath = "FIT_hcal_results.dat"
-auxfiles_runlist_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
+# auxfiles_runlist_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
+auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
 processed_fit_filepath = "FIT_hcal_results_processed.dat"
 
 runnums = []

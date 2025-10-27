@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import subprocess
-from tqdm import tqdm
 import os
 import sys
+from tqdm import tqdm
 
 script_path = "CALIB_CHECKS_hcal.py"
 fit_results = []
@@ -12,9 +12,11 @@ fit_results_filepath = "FIT_hcal_results.dat"
 # --------------------------------------------------------------------------
 # Checking that fit results file exists
 # --------------------------------------------------------------------------
+
 if not os.path.exists(fit_results_filepath):
-    print(f"ERROR: Output file {fit_results_filepath} does not exist! Exiting.")
-    sys.exit(1)
+    print(f"Initializing new {fit_results_filepath}...")
+    with open(fit_results_filepath, "w") as outfile:
+        outfile.write("#runnum\tmean\tfit_sigma\n")
 
 # --------------------------------------------------------------------------
 # Now looping over the runs
@@ -47,7 +49,7 @@ for runnum in tqdm(range(23833, 25604)):
         # print(result.stdout.decode()) #Uncomment this line if you wish to see stdout prints.
 
     except subprocess.CalledProcessError as e:
-        tqdm.write(f"ERROR code {e.returncode} for run {runnum}; check if this is an SHMS run.")
+        tqdm.write(f"ERROR code {e.returncode} for run {runnum}; check if this is an HMS run.")
         continue
 
 if not os.path.exists(fit_results_filepath):

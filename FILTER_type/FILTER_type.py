@@ -10,9 +10,11 @@ import csv
 
 input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
 report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
-run_info_filepath = "/work/hallc/c-rsidis/relder/pass0/run_info_pass0.csv"
+run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
 
-skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
+skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860, 24482, 24496, 25013]
+# Runs 23853 - 23860 are commissioning runs; skipping these for now
+# What is happening with yields on 24482, 24496, 25013?
 
 # =====================================================================
 # Handling user inputs
@@ -120,8 +122,17 @@ if os.path.exists(run_info_filepath):
         for row in reader:
             try:
                 runnum = int(row["run"])
-                corr_coeff = row.get("corr_coeff", "N/A")
-                runinfo_lookup[runnum] = corr_coeff
+                if selected_type in ["lh2", "ld2"]:
+                    fan_current_correction = row.get("fan_current_correction", "N/A")
+                else:
+                    fan_current_correction = 1.0
+                fan_mean = row.get("fan_mean", "N/A")
+
+                runinfo_lookup[runnum] = {
+                    "fan_current_correction": fan_current_correction,
+                    "fan_mean": fan_mean
+                    }
+                
             except (ValueError, KeyError):
                 continue
 
@@ -131,7 +142,7 @@ if os.path.exists(run_info_filepath):
         
 with open(output_filepath, "w") as outfile:
     # Write header
-    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\tcorr_coeff\t# Comments\n")
+    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\txbj\tfan_mean\tfancorr\t# Comments\n")
     
     for line in filtered_lines:
         parts = re.split(r'\s+', line.strip())
@@ -209,10 +220,13 @@ with open(output_filepath, "w") as outfile:
         Q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
         epsilon = 1 / (1 + 2 * (1 + (nu**2 / Q2)) * np.tan(hms_th_rad/ 2))**2
         runnum_int = int(runnum)
-        runinfo_val = runinfo_lookup.get(runnum_int, "N/A")
+        runinfo_val = runinfo_lookup.get(runnum_int, {"fan_current_correction": "N/A", "fan_mean":"N/A"})
+        fan_current_correction = runinfo_val["fan_current_correction"]
+        fan_mean = runinfo_val["fan_mean"]
+        xbj = Q2 / (2 * 0.938 * (abs(float(nu))))
         # Composing the tsv line
         # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, nu, Q2,  comment ])
-        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", runinfo_val, comment]))
+        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", f"{xbj:.3f}", fan_mean, fan_current_correction, comment]))
 
         outfile.write(tsv_line + "\n")
 

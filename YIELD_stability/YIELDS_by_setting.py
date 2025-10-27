@@ -12,7 +12,15 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from tqdm import tqdm
 
-# -- User inputs and input processing, logic to select the setting--
+# ===============================
+# Filepath inputs
+# ===============================
+
+input_root_directory = "/cache/hallc/c-rsidis/analysis/replays/pass0"
+
+# ===============================
+# User inputs, input processing.  Will grab input file from ../FILTER_type/ directories.
+# ===============================
 
 selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
 if not selected_type:
@@ -28,8 +36,6 @@ beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
 if not beam_prefix:
     print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
     exit(1)
-
-# selected_angle = input("Enter the desired HMS angle (present options: ): ").strip() #  This is kind of pointless for HMSDIS, only one setting... commenting out
 
 selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
 selected_target_shortcut_to_target_variable = {"al":"al","al13":"al","aluminum":"al",
@@ -47,11 +53,11 @@ if not selected_target_shortname:
     print(f"Unknown target: {selected_target}.  Please try again.")
     exit(1)
     
-input_settings_filepath = f"../FILTER_type/{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the lookup tables for the input runs by setting
+input_settings_filepath = f"../FILTER_type/{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
 
-
-# Leaving ordered list of all the components of the lookup table:
-# Run#	date	tstart	ebeam	Ibeam	target	HMSp	HMSth	SHMSp	SHMSth	ps1,ps2,ps3,ps4,ps5,ps6	runtype	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	hELREAL	TrackEff	# comments
+# ===============================
+# Extracting information
+# ===============================
 
 runnums = []
 prescale3_factors = []
@@ -60,8 +66,6 @@ beam_charges = []
 tracking_effs = []
 livetimes = []
 hmsmomentum = []
-
-
 
 with open(input_settings_filepath, "r") as infile:
     next(infile) # Skipping the header line here
@@ -75,6 +79,10 @@ with open(input_settings_filepath, "r") as infile:
         tracking_effs.append(parts[18])
         hmsmomentum.append(parts[6])
 
+# ===============================
+# Initializing histogram information
+# ===============================
+        
 branches = ["H.gtr.dp", "H.cer.npeSum", "H.cal.etottracknorm"]
 
 delta = "H.gtr.dp"
@@ -101,11 +109,7 @@ for idx, (runnum, ps3, ps4, charge, eff, livetime) in enumerate(tqdm(zip(runnums
     else:
         tqdm.write(f"Run {runnum} has no valid prescale (both -1), skipping...")
         continue
-
-        
-    # input_root_filepath = f"~/rsidis-2025/hallc_replay_rsidis/ROOTfiles/hms_coin_replay_production_{runnum}_-1.root"
-    # input_root_filepath = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles/hms_coin_replay_production_{runnum}_-1.root"
-    input_root_filepath = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0/ROOTfiles/hms_coin_replay_production_{runnum}_-1.root"
+    input_root_filepath = f"{input_root_directory}/hms_coin_replay_production_{runnum}_-1.root"
     try:
         with uproot.open(input_root_filepath) as file:
             # print(f"Starting analysis for run {runnum}, continuing...")
@@ -161,49 +165,6 @@ x_indices = np.arange(len(df))
 # -- Categorizing runs based on prescale for plotting with different colors
 ps3_mask = (parsed_ps3 != -999) & (parsed_ps3 != -1)
 ps4_mask = ~ps3_mask
-
-# plt.figure(figsize=(12,6))
-
-# # Ps3 electrons
-# mask = elec_mask & ps3_mask
-# plt.scatter(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#             color='red', s=20, marker='o', label='Ps3 HMS 3/4 elec')
-# plt.errorbar(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#              yerr=np.array(df.loc[mask, "yield_err"]), fmt='none', ecolor='red')
-
-# # Ps4 electrons
-# mask = elec_mask & ps4_mask
-# plt.scatter(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#             color='blue', s=20, marker='o', label='Ps4 HMS ELREAL elec')
-# plt.errorbar(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#              yerr=np.array(df.loc[mask, "yield_err"]), fmt='none', ecolor='blue')
-
-# # Ps3 positrons
-# mask = pos_mask & ps3_mask
-# plt.scatter(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#             color='red', s=20, marker='x', label='Ps3 HMS 3/4 pos')
-# plt.errorbar(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#              yerr=np.array(df.loc[mask, "yield_err"]), fmt='none', ecolor='red')
-
-# # Ps4 positrons
-# mask = pos_mask & ps4_mask
-# plt.scatter(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#             color='blue', s=20, marker='x', label='Ps4 HMS ELREAL pos')
-# plt.errorbar(np.array(x_indices)[mask], np.array(df.loc[mask, "yield"]),
-#              yerr=np.array(df.loc[mask, "yield_err"]), fmt='none', ecolor='blue')
-
-
-# plt.xticks(x_indices, df["runnum"], rotation=45, fontsize = 10)
-# plt.xlabel("Run Number", fontsize = 12)
-# plt.ylabel("Delta Yield per mC", fontsize = 12)
-# plt.title(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields", fontsize = 14)
-# plt.grid(True, linestyle='--', color = 'gray', alpha=0.3)
-# plt.margins(y = 0.1)
-
-# plt.legend(frameon = True, fontsize = 10)
-
-# plt.tight_layout()
-# plt.savefig(f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_yields.png")
 
 def plot_yields(df, x_indices, mask_group, title_suffix, filename_suffix):
     plt.figure(figsize=(12,6))

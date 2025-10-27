@@ -14,7 +14,8 @@ from scipy.optimize import curve_fit
 runnum = input(f"Input the run number you wish to analyze:")
 
 # Directory information, modify as needed
-root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
+# root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
+root_directory = f"/cache/hallc/c-rsidis/analysis/replays/pass0"
 coin_pattern = f"coin_replay_production_{runnum}_-1.root"
 hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
 

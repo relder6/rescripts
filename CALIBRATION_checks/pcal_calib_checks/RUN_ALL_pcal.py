@@ -13,8 +13,9 @@ fit_results_filepath = "FIT_pcal_results.dat"
 # Checking that fit results file exists
 # --------------------------------------------------------------------------
 if not os.path.exists(fit_results_filepath):
-    print(f"ERROR: Output file {fit_results_filepath} does not exist! Exiting.")
-    sys.exit(1)
+    print(f"Initializing new {fit_results_filepath}...")
+    with open(fit_results_filepath, "w") as outfile:
+        outfile.write("#runnum\tmean\tfit_sigma\n")
 
 # --------------------------------------------------------------------------
 # Now looping over the runs
