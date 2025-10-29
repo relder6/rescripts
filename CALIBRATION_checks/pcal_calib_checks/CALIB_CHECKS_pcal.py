@@ -11,27 +11,27 @@ import boost_histogram as bh
 import matplotlib.colors as mplcolors
 from scipy.optimize import curve_fit
 
-runnum = input(f"Input the run number you wish to analyze:")
+# --------------------------------------------------------------------------
+# User inputs, directories, branches for plotting scripts; modify as needed
+# --------------------------------------------------------------------------
+if len(sys.argv) > 1:
+    runnum = sys.argv[1]
+else:
+    runnum = input("Input the run number you wish to analyze: ")
 
-# Directory information, modify as needed
-# root_directory = f"/volatile/hallc/c-rsidis/cmorean/replay_pass0a/ROOTfiles"
-root_directory = f"/cache/hallc/c-rsidis/analysis/replays/pass0"
-coin_pattern = f"coin_replay_production_{runnum}_-1.root"
-shms_pattern = f"shms_coin_replay_production_{runnum}_-1.root"
+root_directory = f"/work/hallc/c-rsidis/skimfiles/pass0"
+coin_pattern = f"skimmed_coin_replay_production_{runnum}_-1.root"
+shms_pattern = f"skimmed_shms_coin_replay_production_{runnum}_-1.root"
+auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
 
 d_calo_fp = 292.64 # distance from focal plane to calorimeter face
 
-branches = [
-    "P.dc.x_fp",
-    "P.dc.y_fp",
-    "P.dc.xp_fp",
-    "P.dc.yp_fp",
-    "P.gtr.dp",
-    "P.ngcer.npeSum",
-    "P.cal.etottracknorm"
-]
+branches = ["P_dc_x_fp", "P_dc_y_fp", "P_dc_xp_fp", "P_dc_yp_fp",
+            "P_gtr_dp", "P_ngcer_npeSum", "P_cal_etottracknorm"]
 
-
+# --------------------------------------------------------------------------
+# Trying to open root files, basically filters out HMS replays
+# --------------------------------------------------------------------------
 try:
     input_root_filepath = f"{root_directory}/{coin_pattern}"
     df = pd.DataFrame(uproot.open(input_root_filepath)["T"].arrays(branches, library = "np"))
@@ -47,15 +47,18 @@ except OSError:
         
 print(f"Found {file_type} run {runnum}.  Dataframe {len(df)} rows.  Processing...")
 
-cuts = ((df["P.gtr.dp"] > -15) & (df["P.gtr.dp"] < 27) & (df["P.ngcer.npeSum"] > 2))
+# --------------------------------------------------------------------------
+# Setting up variables for plotting
+# --------------------------------------------------------------------------
+cuts = ((df["P_gtr_dp"] > -15) & (df["P_gtr_dp"] < 27) & (df["P_ngcer_npeSum"] > 2))
 
 df_cut = df[cuts].copy()
 
-xcalo = ((df_cut["P.dc.x_fp"]) + (df_cut["P.dc.xp_fp"])*d_calo_fp)
+xcalo = ((df_cut["P_dc_x_fp"]) + (df_cut["P_dc_xp_fp"])*d_calo_fp)
 
-ycalo = ((df_cut["P.dc.y_fp"]) + (df_cut["P.dc.yp_fp"])*d_calo_fp)
+ycalo = ((df_cut["P_dc_y_fp"]) + (df_cut["P_dc_yp_fp"])*d_calo_fp)
 
-weight = df_cut["P.cal.etottracknorm"]
+weight = df_cut["P_cal_etottracknorm"]
 
 finite_mask = np.isfinite(xcalo) & np.isfinite(ycalo) & np.isfinite(weight)
 
@@ -87,12 +90,10 @@ counts_unweighted = hCaloPos.view()
 with np.errstate(divide='ignore', invalid='ignore'):
     hCaloPosNormU = np.divide(counts_weighted, counts_unweighted)
     hCaloPosNormU[~np.isfinite(hCaloPosNormU)] = 0  # set inf/NaN to 0
-
     
 # -----------------------------------------------------------------------------
-# Plotting figures, disabling most of them but will leave in code for debugging
+# Plotting figures, disabling them  but will leave in code for debugging
 # -----------------------------------------------------------------------------
-
 # plt.figure(figsize=(8, 6))
 # plt.imshow(
 #     hCaloPos.view().T,
@@ -124,19 +125,16 @@ with np.errstate(divide='ignore', invalid='ignore'):
 # -----------------------------------------------------------------------------
 # Getting the figure ready to place both plots
 # -----------------------------------------------------------------------------
-
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (14, 6), constrained_layout = True)
 fig.suptitle(f"{file_type} Run {runnum}", fontsize=16, fontweight="bold")
 
 # -----------------------------------------------------------------------------
 # Plotting normalized e/p per track at calorimeter
 # -----------------------------------------------------------------------------
-
-# Color mapping stuff
 data = hCaloPosNormU.view()
 vmin = 0
 vmax_candidate = np.nanmax(data)
-vmax = vmax_candidate if vmax_candidate > vmin else vmin + 1  # avoid zero range
+vmax = vmax_candidate if vmax_candidate > vmin else vmin + 1  # avoiding zero range here
 
 def safe_norm_pos(val, vmin, vmax, prev_pos):
     if vmax == vmin:
@@ -175,16 +173,14 @@ ax1.set_title(f"Normalized E/p per Track at Calorimeter", fontsize=14)
 
 cbar = fig.colorbar(im, ax=ax1, format='%.1f', pad=0.01)
 
-# Set ticks dynamically from 0 to floor(vmax)
 ticks = np.arange(0, int(np.floor(vmax)) + 0.5, 1)
 cbar.set_ticks(ticks)
 cbar.set_ticklabels([f"{tick:.1f}" for tick in ticks])
 cbar.ax.tick_params(labelsize=8)
 
-
 ax1.set_title(f"Normalized E/p per Track at Calorimeter", fontsize = 14)
 
-# Now adding the grid overlay,
+# Now adding the block grid,
 numrows, numcols, blockspacing = 16, 14, 9
 startrow, startcol = -blockspacing * numrows / 2.0, -blockspacing * numcols / 2.0
 for i in range(numrows + 1):
@@ -197,10 +193,9 @@ for i in range(numcols + 1):
 # -----------------------------------------------------------------------------
 # Plotting fitted distribution of e/p
 # -----------------------------------------------------------------------------
-
 bin_min, bin_max, bin_num = 0, 2, 200
 data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
-counts, bin_edges = np.histogram(df_cut["P.cal.etottracknorm"], bins=data_bins)
+counts, bin_edges = np.histogram(df_cut["P_cal_etottracknorm"], bins=data_bins)
 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
 fit_min, fit_max = 0.9, 1.1
@@ -222,13 +217,15 @@ def gaussian(x, amp, mean, sigma):
     return amp * np.exp(-(x - mean)**2 / (2 * sigma**2))
 
 from scipy.optimize import curve_fit
-popt, _ = curve_fit(gaussian, x_fit, y_fit, p0=[amp_guess, mean_guess, sigma_guess])
+popt, pcov = curve_fit(gaussian, x_fit, y_fit, p0=[amp_guess, mean_guess, sigma_guess])
+amp_fit, mean_fit, sigma_fit = popt
+amp_err, mean_err, sigma_err = np.sqrt(np.diag(pcov))
 
 # Extracting here the fit results
 amp_fit, mean_fit, sigma_fit = popt
 
 # Now plotting to the second pad
-ax2.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
+ax2.hist(df_cut["P_cal_etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
 x_plot = np.linspace(fit_min, fit_max, 500)
 ax2.plot(x_plot, gaussian(x_plot, *popt), color = 'navy', label='Gaussian fit')
 
@@ -251,9 +248,8 @@ ax2.text(
 # --------------------------------------------------------------------------
 # Save the combined figure
 # --------------------------------------------------------------------------
-
 plt.savefig(f"{file_type}/{file_type}_run_{runnum}_pcal.png", dpi=300, bbox_inches="tight")
-plt.close()
+plt.close(fig)
 
-print(f"{runnum}\t{mean_fit:.6f}\t{sigma_fit:.6f}") # Don't uncomment this line!  This helps for PLOT_... script.
+print(f"{runnum}\t{mean_fit}\t{mean_err}\t{sigma_fit}\t{sigma_err}") # Don't uncomment this line!  This helps for PLOT_... script.
 

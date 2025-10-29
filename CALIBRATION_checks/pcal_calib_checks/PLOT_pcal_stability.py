@@ -4,16 +4,13 @@ import os, re
 import pandas as pd
 import matplotlib.pyplot as plt
 
-fit_results_filepath = "FIT_pcal_results.dat"
-# auxfiles_runlist_filepath = "/home/cdaq/rsidis-2025/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
+fit_results_filepath = "DAT/FIT_pcal_results.dat"
 auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
-processed_fit_filepath = "FIT_pcal_results_processed.dat"
+processed_fit_filepath = "DAT/FIT_pcal_results_processed.dat"
 
 runnums = []
 shms_p = []
 runtypes = []
-
-
 
 def extract_parts(line):
     parts = re.split(r'\s+', line.strip())
@@ -62,7 +59,7 @@ run_to_mom = dict(zip(runnums, shms_p))
 run_to_type = dict(zip(runnums, runtypes))
 
 with open(fit_results_filepath, "r") as infile, open(processed_fit_filepath, "w") as outfile:
-    outfile.write("#runnum\tfit_mean\tfit_error\tshms_p\tfiletype\n") # Writing the header
+    outfile.write("#runnum\tfit_mean\tmean_err\tfit_sigma\tsigma_err\tshms_p\truntype\n") # Writing the header
     for line in infile:
         if line.lstrip().startswith("#"): # And skipping here the header from the infile
             continue
@@ -71,14 +68,17 @@ with open(fit_results_filepath, "r") as infile, open(processed_fit_filepath, "w"
             continue
         runnum = parts[0]
         fit_mean = parts[1]
-        fit_error = parts[2]
+        mean_err = parts[2]
+        fit_sigma = parts[3]
+        sigma_err = parts[4]
         momentum = run_to_mom.get(runnum, "")
         run_type = run_to_type.get(runnum, "")
-        
-        if momentum != "":
-            outfile.write(f"{runnum}\t{fit_mean}\t{fit_error}\t{momentum:+.3f}\t{run_type}\n")
-        else:
-            outfile.write(f"{runnum}\t{fit_mean}\t{fit_error}\t\t{run_type}\n")
+
+        if momentum is None:
+            raise ValueError(f"Run {runnum} has no momentum assigned!")
+        if run_type is None or pd.isna(run_type):
+            raise ValueError(f"Run {runnum} has no run type assigned!")
+        outfile.write(f"{runnum}\t{fit_mean}\t{mean_err}\t{fit_sigma}\t{sigma_err}\t{momentum}\t{run_type}\n")
 
 print(f"Wrote processed fit results to {processed_fit_filepath}")
 
@@ -86,12 +86,26 @@ df = pd.read_csv(
     processed_fit_filepath,
     comment="#",
     sep=r"\s+",
-    names=["runnum", "fit_mean", "fit_error", "momentum", "run_type"],
-    dtype={"runnum": str}
+    names=["runnum", "fit_mean", "mean_err", "fit_sigma", "sigma_err", "momentum", "run_type"],
+    dtype={"runnum": str, "momentum":str, "run_type":str}
 )
 
-available_types = sorted(df["run_type"].unique())
+df["fit_mean"] = df["fit_mean"].astype(float)
+df["fit_sigma"] = df["fit_sigma"].astype(float)
+df["runnum"] = df["runnum"].astype(str).str.replace(r"\.0$", "", regex=True)
+
+df["runnum_int"] = df["runnum"].astype(int)
+df = df.sort_values("runnum_int")
+
+available_types = [str(rt) for rt in df["run_type"].unique() if isinstance(rt, str) or not pd.isna(rt)]
+available_types = [rt for rt in available_types if rt != 'nan']
+available_types = sorted(available_types)
+
+print("Available run types with types:")
+for i, val in enumerate(df["run_type"].unique()):
+    print(i, repr(val), type(val))
 print("\nAvailable run types:", ", ".join(available_types))
+
 selected = input("Enter comma-separated run types to include (or 'all'): ").strip().lower()
 
 if selected != "all":
@@ -109,9 +123,9 @@ plt.figure(figsize=(10, 6))
 
 for run_type, subdf in df.groupby("run_type"):
     plt.errorbar(
-        subdf["runnum_int"],
-        subdf["fit_mean"],
-        yerr=subdf["fit_error"],
+        subdf["runnum_int"].to_numpy(),
+        subdf["fit_mean"].to_numpy(),
+        yerr=subdf["mean_err"].to_numpy(),
         fmt="o",
         capsize=0,
         elinewidth = 0.5,
@@ -122,8 +136,19 @@ plt.axhline(1.0, color='navy', linestyle='--', linewidth=1.2, label='y = 1')
 
 plt.xlabel("Run Number", fontsize=13)
 plt.ylabel("Fit Mean", fontsize=13)
-plt.title("SHMS Calorimeter Fitted E/p vs Run Number", fontsize=15)
+plt.title(f"SHMS Calorimeter Fitted E/p vs Run Number\nSelected Run Types: {selected}", fontsize=15)
 plt.legend(title="Run Type", fontsize=10)
 plt.grid(True, linestyle="--", alpha=0.6)
+
+if selected == "all":
+    prefix = "all"
+else:
+    prefix = "_".join(chosen_types)
+    prefix = prefix.replace(" ", "_").replace("/", "-")
+
+outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_pcal.png"
+
 plt.tight_layout()
-plt.savefig("pcal_calib_etottracknorm_vs_runnum.png", dpi = 300)
+plt.savefig(outfile, dpi = 300)
+plt.close()
+print(f"Saved plot to {outfile}")

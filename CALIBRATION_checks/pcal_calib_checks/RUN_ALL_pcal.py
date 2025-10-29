@@ -1,77 +1,84 @@
 #!/usr/bin/env python3
 
-import subprocess
+import os, re, csv, subprocess
 from tqdm import tqdm
-import os
-import sys
 
 script_path = "CALIB_CHECKS_pcal.py"
-fit_results = []
-fit_results_filepath = "FIT_pcal_results.dat"
+fit_results_filepath = "DAT/FIT_pcal_results.dat"
+auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
 
 # --------------------------------------------------------------------------
-# Checking that fit results file exists
+# Load existing fit results
 # --------------------------------------------------------------------------
-if not os.path.exists(fit_results_filepath):
-    print(f"Initializing new {fit_results_filepath}...")
-    with open(fit_results_filepath, "w") as outfile:
-        outfile.write("#runnum\tmean\tfit_sigma\n")
+fit_result_lines = {}
+if os.path.exists(fit_results_filepath):
+    with open(fit_results_filepath, "r") as infile:
+        lines = infile.readlines()
+        if len(lines) > 1:
+            for line in lines[1:]:
+                if line.strip():
+                    runnum, mean, meanerr, sigma, sigmaerr = line.strip().split("\t")
+                    fit_result_lines[runnum] = [mean, meanerr, sigma, sigmaerr]
+                    
+# --------------------------------------------------------------------------
+# Extracting valid run numbers from the auxfiles runlist
+# --------------------------------------------------------------------------
+
+def extract_parts(line):
+    parts = re.split(r'\s+', line.strip())
+    if not parts:
+        return None
+    if len(parts) >=12:
+        run_type = parts[11].strip().lower()
+        if run_type == "junk":
+            return None
+    return parts[0]
+
+runnums = []
+
+with open(auxfiles_runlist_filepath, "r") as infile:
+    for line in infile:
+        line = line.strip()
+        if not line or line.startswith(("#", "!", "-", "=", "*")):
+            continue
+        runnum = extract_parts(line)
+        if runnum:
+            runnums.append(runnum)
 
 # --------------------------------------------------------------------------
-# Now looping over the runs
+# Processing runs
 # --------------------------------------------------------------------------
+updated_fit_results = {}
 
-# Full range of rsidis phase 1 runs is 23833, 25604
-for runnum in tqdm(range(23833, 25604)):
+for runnum in tqdm(runnums):
     try:
         result = subprocess.run(
-            ["python3", script_path],
-            input=str(runnum),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            text = True
-            )
-        lines = [line for line in result.stdout.splitlines() if line.strip()]
+            ["python3", script_path, runnum],
+            capture_output=True, text=True, check=False)
 
-        fit_line = None
-        for line in lines:
-            if line.startswith(str(runnum)):
-                fit_line = line
-                break
-        if fit_line is None:
-            tqdm.write(f"WARNING: Fit results not found for run {runnum}. Skipping...")
+        if result.returncode !=0:
+            tqdm.write(f"WARNING: Run {runnum} failed (returncode {result.returncode}): skipping...")
             continue
-        
-        run, mean, sigma = fit_line.split("\t")
-        fit_results.append((run, mean, sigma))
-        # print(result.stdout.decode()) #Uncomment this line if you wish to see stdout prints.
 
-    except subprocess.CalledProcessError as e:
-        tqdm.write(f"ERROR code {e.returncode} for run {runnum}; check if this is an SHMS run.")
+        fit_line = next((line for line in result.stdout.splitlines() if line.startswith(runnum + "\t")), None)
+
+        if fit_line is None:
+            tqdm.write(f"WARNING: Fit results not found for run {runnum}; skipping...")
+            continue
+
+        run, mean, meanerr, sigma, sigmaerr = fit_line.split("\t")
+        updated_fit_results[run] = [mean, meanerr, sigma, sigmaerr]
+
+    except Exception as e:
+        tqdm.write(f"ERROR: Unexpected error for run {runnum}: {e}")
         continue
 
-if not os.path.exists(fit_results_filepath):
-    print(f"ERROR: Output file {fit_results_filepath} does not exist! Exiting.")
-    sys.exit(1)
-
 # --------------------------------------------------------------------------
-# Opening existing stats file
-# --------------------------------------------------------------------------
-    
-with open(fit_results_filepath, "r") as infile:
-    lines = infile.readlines()
-
-header = lines[0]
-fit_result_lines = {line.split("\t")[0]: line.strip().split("\t")[1:] for line in lines[1:] if line.strip()}
-
-for run, mean, sigma in fit_results:
-    fit_result_lines[run] = [mean, sigma]
-
-# --------------------------------------------------------------------------
-# Writes fit results to stats file
+# Write fit results back to file
 # --------------------------------------------------------------------------
 with open(fit_results_filepath, "w") as outfile:
-    outfile.write(header)
-    for run, values in sorted(fit_result_lines.items(), key=lambda x: int(x[0])):
-        outfile.write(f"{run}\t{values[0]}\t{values[1]}\n")
+    outfile.write("#runnum\tfit_mean\tmean_err\tfit_sigma\tsigma_err\n")
+    for run, (mean, meanerr, sigma, sigmaerr) in sorted(updated_fit_results.items(), key=lambda x: int(float(x[0]))):
+        outfile.write(f"{run}\t{mean}\t{meanerr}\t{sigma}\t{sigmaerr}\n")
+
+tqdm.write(f"Processing complete. Total runs processed: {len(updated_fit_results)}")
