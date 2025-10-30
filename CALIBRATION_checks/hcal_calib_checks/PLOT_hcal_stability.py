@@ -22,8 +22,8 @@ def extract_parts(line):
 
     if len(parts) > 0:
         runnum = parts[0]
-    if len(parts) >= 9:
-        momentum_placeholder = parts[8]
+    if len(parts) >= 7:
+        momentum_placeholder = parts[6]
         try:
             momentum = float(momentum_placeholder)
         except ValueError:
@@ -124,9 +124,9 @@ plt.figure(figsize=(10, 6))
 
 for run_type, subdf in df.groupby("run_type"):
     plt.errorbar(
-        subdf["runnum_int"],
-        subdf["fit_mean"],
-        yerr=subdf["mean_err"],
+        subdf["runnum_int"].to_numpy(),
+        subdf["fit_mean"].to_numpy(),
+        yerr=subdf["mean_err"].to_numpy(),
         fmt="o",
         capsize=0,
         elinewidth = 0.5,
@@ -147,7 +147,7 @@ else:
     prefix = "_".join(chosen_types)
     prefix = prefix.replace(" ", "_").replace("/", "-")
 
-outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_pcal.png"
+outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_hcal.png"
 
 plt.tight_layout()
 plt.savefig(outfile, dpi = 300)

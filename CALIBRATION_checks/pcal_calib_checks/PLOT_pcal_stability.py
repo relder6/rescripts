@@ -152,3 +152,38 @@ plt.tight_layout()
 plt.savefig(outfile, dpi = 300)
 plt.close()
 print(f"Saved plot to {outfile}")
+
+#########################
+
+plt.figure(figsize=(10, 6))
+
+for run_type, subdf in df.groupby("run_type"):
+    plt.errorbar(
+        subdf["runnum_int"].to_numpy(),
+        subdf["fit_sigma"].to_numpy(),
+        yerr=subdf["sigma_err"].to_numpy(),
+        fmt="o",
+        capsize=0,
+        elinewidth = 0.5,
+        markersize = 3,
+        label=run_type
+    )
+
+plt.xlabel("Run Number", fontsize=13)
+plt.ylabel("Fit Mean", fontsize=13)
+plt.title(f"SHMS Calorimeter Fitted E/p Sigma vs Run Number\nSelected Run Types: {selected}", fontsize=15)
+plt.legend(title="Run Type", fontsize=10)
+plt.grid(True, linestyle="--", alpha=0.6)
+
+if selected == "all":
+    prefix = "all"
+else:
+    prefix = "_".join(chosen_types)
+    prefix = prefix.replace(" ", "_").replace("/", "-")
+
+outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_sigma_pcal.png"
+
+plt.tight_layout()
+plt.savefig(outfile, dpi = 300)
+plt.close()
+print(f"Saved plot to {outfile}")

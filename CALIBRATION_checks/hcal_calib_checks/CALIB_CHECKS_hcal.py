@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys
+import sys, os
 import matplotlib
 matplotlib.use('Agg')
 import uproot
@@ -21,6 +21,7 @@ else:
 
 root_directory = f"/work/hallc/c-rsidis/skimfiles/pass0"
 coin_pattern = f"skimmed_coin_replay_production_{runnum}_-1.root"
+shms_pattern = f"skimmed_shms_coin_replay_production_{runnum}_-1.root"
 hms_pattern = f"skimmed_hms_coin_replay_production_{runnum}_-1.root"
 auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
 
@@ -34,25 +35,41 @@ branches = ["H_dc_x_fp", "H_dc_y_fp", "H_dc_xp_fp", "H_dc_yp_fp",
 # --------------------------------------------------------------------------
 try:
     input_root_filepath = f"{root_directory}/{coin_pattern}"
-    df = pd.DataFrame(uproot.open(input_root_filepath)["T"].arrays(branches, library = "np"))
+    if not os.path.exists(input_root_filepath):
+        raise FileNotFoundError
+    df = uproot.open(input_root_filepath)["T"].arrays(branches, library="pd")
     file_type = "COIN"
-except OSError:
+
+except FileNotFoundError:
     try:
         input_root_filepath = f"{root_directory}/{hms_pattern}"
-        df = pd.DataFrame(uproot.open(input_root_filepath)["T"].arrays(branches, library = "np"))
+        if not os.path.exists(input_root_filepath):
+            raise FileNotFoundError
+        df = uproot.open(input_root_filepath)["T"].arrays(branches, library="pd")
         file_type = "HMS"
-    except OSError:
-        print(f"Run {runnum} not valid for hcal calibration; skipping...")
+
+    except FileNotFoundError:
+        input_root_filepath = f"{root_directory}/{shms_pattern}"
+        if os.path.exists(input_root_filepath):
+            print(f"WARNING:\tRun {runnum} is an SHMS replay; skipping...")
+        else:
+            print(f"ERROR:\tRun {runnum} is missing a ROOTfile; skipping...")
         sys.exit(1)
-        
-print(f"Found {file_type} run {runnum}.  Dataframe {len(df)} rows.  Processing...")
+
+    except uproot.exceptions.KeyInFileError as e:
+        print(f"ERROR:\tRun {runnum} is an HMS file missing branch '{e.key}'; skipping...")
+        sys.exit(1)
+
+except uproot.exceptions.KeyInFileError as e:
+    print(f"ERROR:\tRun {runnum} is a COIN file missing branch '{e.key}'; skipping...")
+    sys.exit(1)
 
 # --------------------------------------------------------------------------
 # Setting up variables for plotting
 # --------------------------------------------------------------------------
-cuts = ((df["H_gtr_dp"].between(-8,8)) & (df["H_cer_npeSum"] > 1.5))
+cuts = ((df["H_gtr_dp"].between(-8,8)) & (df["H_cer_npeSum"] > 1.5)) & (df["H_cal_etottracknorm"] > 0)
 
-df_cut = df[cuts].copy()
+df_cut = df[cuts]
 
 xcalo = ((df_cut["H_dc_x_fp"]) + (df_cut["H_dc_xp_fp"])*d_calo_fp)
 
@@ -231,7 +248,7 @@ data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
 counts, bin_edges = np.histogram(df_cut["H_cal_etottracknorm"], bins=data_bins)
 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-fit_min, fit_max = 0.9, 1.1
+fit_min, fit_max = 0.90, 1.00
 fit_mask = (bin_centers >= fit_min) & (bin_centers <= fit_max)
 
 x_fit = bin_centers[fit_mask]
@@ -242,6 +259,9 @@ x_fit = x_fit[nonzero]
 y_fit = y_fit[nonzero]
 
 # Guess for initial fit ONLY within fit range
+if y_fit.size == 0:
+    print(f"WARNING:\tRun {runnum} contains no events in range; skipping...")
+    sys.exit(2)
 amp_guess = np.max(y_fit)
 mean_guess = np.sum(x_fit * y_fit) / np.sum(y_fit)
 sigma_guess = np.sqrt(np.sum(y_fit * (x_fit - mean_guess) ** 2) / np.sum(y_fit))
@@ -249,18 +269,32 @@ sigma_guess = np.sqrt(np.sum(y_fit * (x_fit - mean_guess) ** 2) / np.sum(y_fit))
 def gaussian(x, amp, mean, sigma):
     return amp * np.exp(-(x - mean)**2 / (2 * sigma**2))
 
-from scipy.optimize import curve_fit
-popt, pcov = curve_fit(gaussian, x_fit, y_fit, p0=[amp_guess, mean_guess, sigma_guess])
-amp_fit, mean_fit, sigma_fit = popt
-amp_err, mean_err, sigma_err = np.sqrt(np.diag(pcov))
-
-# Extracting here the fit results
-amp_fit, mean_fit, sigma_fit = popt
+# Setting a flag for failures in the fit.  If unable to find a fit, we'll still make the plot, just with printed text on top.
+fit_failed = False
+try:
+    popt, pcov = curve_fit(gaussian, x_fit, y_fit, p0=[amp_guess, mean_guess, sigma_guess])
+    amp_fit, mean_fit, sigma_fit = popt
+    amp_err, mean_err, sigma_err = np.sqrt(np.diag(pcov))
+except:
+    fit_failed = True
+    print(f"WARNING:\tRun {runnum} was unable to find a Gaussian fit; skipping...")
+    amp_fit = mean_fit = sigma_fit = amp_err = mean_err = sigma_err = np.nan
 
 # Now plotting to the second pad
 ax2.hist(df_cut["H_cal_etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
 x_plot = np.linspace(fit_min, fit_max, 500)
-ax2.plot(x_plot, gaussian(x_plot, *popt), color = 'navy', label='Gaussian fit')
+
+if not fit_failed:
+    x_plot = np.linspace(fit_min, fit_max, 500)
+    ax2.plot(x_plot, gaussian(x_plot, *popt), color='navy', label='Gaussian fit')
+    ax2.text(0.05, 0.95,
+             f"Mean = {mean_fit:.4f}\nSigma = {sigma_fit:.4f}",
+             transform=ax2.transAxes, verticalalignment='top', fontsize=10,
+             bbox=dict(facecolor='white', alpha=0.7, edgecolor='black'))
+else:
+    ax2.text(0.5, 0.5, "FIT FAILED", color="navy", ha="center", va="center",
+             transform=ax2.transAxes,fontsize=30, fontweight='bold',
+             rotation = 45, alpha = 0.3, bbox = dict(facecolor='none', edgecolor='none'))
 
 ax2.set_xlim(bin_min, bin_max)
 ax2.set_xlabel("E/p", fontsize=12)
@@ -269,20 +303,11 @@ ax2.set_title(f"Fitted E/p", fontsize=14)
 ax2.grid(alpha=0.5)
 ax2.legend()
 
-ax2.text(
-    0.05, 0.95,
-    f"Mean = {mean_fit:.4f}\nSigma = {sigma_fit:.4f}",
-    transform=ax2.transAxes,
-    verticalalignment='top',
-    fontsize=10,
-    bbox=dict(facecolor='white', alpha=0.7, edgecolor='black')
-)
-
 # --------------------------------------------------------------------------
 # Save the combined figure
 # --------------------------------------------------------------------------
 
-plt.savefig(f"{file_type}/{file_type}_run_{runnum}_hcal.png", dpi=300, bbox_inches="tight")
+plt.savefig(f"{file_type}/{file_type}_run_{runnum}_hcal.png", dpi=150, bbox_inches="tight")
 plt.close()
 
 print(f"{runnum}\t{mean_fit}\t{mean_err}\t{sigma_fit}\t{sigma_err}") # Don't uncomment this line!  This helps for PLOT_... script.

@@ -2,11 +2,22 @@
 
 import os, re, csv, subprocess
 from tqdm import tqdm
+from datetime import datetime
+import glob
 
 script_path = "CALIB_CHECKS_hcal.py"
 fit_results_filepath = "DAT/FIT_hcal_results.dat"
 auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
+errlog_filepath = "ERR_log/FIT_hcal_error_log.txt"
 
+start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# --------------------------------------------------------------------------
+# Clearing previous fit histograms
+# --------------------------------------------------------------------------
+for path in glob.glob("COIN/*") + glob.glob("HMS/*"):
+    os.remove(path)
+    
 # --------------------------------------------------------------------------
 # Load existing fit results
 # --------------------------------------------------------------------------
@@ -50,29 +61,57 @@ with open(auxfiles_runlist_filepath, "r") as infile:
 # --------------------------------------------------------------------------
 updated_fit_results = {}
 
-for runnum in tqdm(runnums):
-    try:
-        result = subprocess.run(
-            ["python3", script_path, runnum],
-            capture_output=True, text=True, check=False)
+with open(errlog_filepath, "w") as outfile:
+    
+    outfile.write("RUN_ALL_hcal.py ERROR LOG\n")
+    outfile.write(f"{start_time}\n")
+    outfile.write("# --------------------------------------------------------------------------\n\n")
 
-        if result.returncode !=0:
-            tqdm.write(f"WARNING: Run {runnum} failed (returncode {result.returncode}): skipping...")
+    for runnum in tqdm(runnums):
+        try:
+            result = subprocess.run(
+                ["python3", script_path, runnum],
+                capture_output=True, text=True, check=False)
+
+            if result.returncode !=0:
+                tqdm.write(f"WARNING: Run {runnum} failed (returncode {result.returncode}); logging error...")
+
+                if result.stdout.strip():
+                    outfile.write(f"{runnum} STDOUT: {result.stdout.strip()}\n")
+                if result.stderr.strip():
+                    outfile.write(f"{runnum} STDERR: {result.stderr.strip()}\n")
+                outfile.write("\n")
+                continue
+
+            fit_line = next((line for line in result.stdout.splitlines() if line.startswith(runnum + "\t")), None)
+
+            if fit_line is None:
+                tqdm.write(f"WARNING: Fit results not found for run {runnum}; logging error...")
+
+                if result.stdout.strip():
+                    outfile.write(f"{runnum} STDOUT: {result.stdout.strip()}\n")
+                if result.stderr.strip():
+                    outfile.write(f"{runnum} STDERR: {result.stderr.strip()}\n")
+                outfile.write("\n")
+                continue
+
+            run, mean, meanerr, sigma, sigmaerr = fit_line.split("\t")
+            updated_fit_results[run] = [mean, meanerr, sigma, sigmaerr]
+
+        except Exception as e:
+            tqdm.write(f"ERROR: Unexpected error for run {runnum}: {e}; logging error...")
+
+            if 'result' in locals():
+                if result.stdout.strip():
+                    outfile.write(f"{runnum} STDOUT: {result.stdout.strip()}\n")
+                if result.stderr.strip():
+                    outfile.write(f"{runnum} STDERR: {result.stderr.strip()}\n")
+            else:
+                outfile.write("{runnum} UNKNOWN: No subprocess captured!\n")
+
+            outfile.write("\n")
             continue
-
-        fit_line = next((line for line in result.stdout.splitlines() if line.startswith(runnum + "\t")), None)
-
-        if fit_line is None:
-            tqdm.write(f"WARNING: Fit results not found for run {runnum}; skipping...")
-            continue
-
-        run, mean, meanerr, sigma, sigmaerr = fit_line.split("\t")
-        updated_fit_results[run] = [mean, meanerr, sigma, sigmaerr]
-
-    except Exception as e:
-        tqdm.write(f"ERROR: Unexpected error for run {runnum}: {e}")
-        continue
-
+    
 # --------------------------------------------------------------------------
 # Write fit results back to file
 # --------------------------------------------------------------------------
