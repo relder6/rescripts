@@ -31,17 +31,17 @@ beam_charge_milliC_pos = beam_charge_pos / 1000
 # -----------------------------------------------------
 
 #electron_file = f"/w/hallc-scshelf2102/c-rsidis/relder/ROOTfiles/hms_coin_replay_production_{run_number_electron}_-1.root"
-electron_file = f"/cache/hallc/c-rsidis/analysis/replays/pass0/hms_coin_replay_production_{run_number_electron}_-1.root"
+electron_file = f"/work/hallc/c-rsidis/skimfiles/pass0/skimmed_hms_coin_replay_production_{run_number_electron}_-1.root"
 #positron_file = f"/w/hallc-scshelf2102/c-rsidis/relder/ROOTfiles/hms_coin_replay_production_{run_number_positron}_-1.root"
-positron_file = f"/cache/hallc/c-rsidis/analysis/replays/pass0/hms_coin_replay_production_{run_number_positron}_-1.root"
-mc_file = f"/u/group/c-rsidis/relder/mc-single-arm/worksim/run_{run_number_electron}_mc_single_arm.root"
+positron_file = f"/work/hallc/c-rsidis/skimfiles/pass0/skimmed_hms_coin_replay_production_{run_number_positron}_-1.root"
+mc_file = f"/work/hallc/c-rsidis/relder/mc-single-arm/worksim/run_{run_number_electron}_mc_single_arm.root"
 
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
 # -----------------------------------------------------
 
-branches = ["H.gtr.dp", "H.cal.etottracknorm", "H.gtr.ph", "H.gtr.th", "H.gtr.x", "H.gtr.y",
-    "H.kin.Q2", "H.kin.x_bj", "H.kin.W", "H.cer.npeSum"]
+branches = ["H_gtr_dp", "H_cal_etottracknorm", "H_gtr_ph", "H_gtr_th", "H_gtr_x", "H_gtr_y",
+    "H_kin_Q2", "H_kin_x_bj", "H_kin_W", "H_cer_npeSum"]
 
 branches_mc = ["hsxfp", "hsyfp", "hsxpfp", "hsypfp", "hsdelta", "hsytar", "hsxptar", "hsyptar",
     "hsztar", "fry", "xsnum", "ysnum", "xsieve", "ysieve", "stop_id", "xb", "q2",
@@ -67,8 +67,8 @@ print(f"Positron DF loaded: {len(df_pos)} rows")
 df_mc = pd.DataFrame(uproot.open(mc_file)["h10"].arrays(branches_mc, library="np"))
 print(f"MonteCarlo DF loaded: {len(df_mc)} rows")
 
-cut_elec = (df_elec["H.gtr.dp"].between(-8, 8) & (df_elec["H.cer.npeSum"] > 2) & (df_elec["H.cal.etottracknorm"] > 0.7))
-cut_pos = (df_pos["H.gtr.dp"].between(-8, 8) & (df_pos["H.cer.npeSum"] > 2) & (df_pos["H.cal.etottracknorm"] > 0.7))
+cut_elec = (df_elec["H_gtr_dp"].between(-8, 8) & (df_elec["H_cer_npeSum"] > 2) & (df_elec["H_cal_etottracknorm"] > 0.7))
+cut_pos = (df_pos["H_gtr_dp"].between(-8, 8) & (df_pos["H_cer_npeSum"] > 2) & (df_pos["H_cal_etottracknorm"] > 0.7))
 cut_mc = (df_mc["hsdelta"].between(-8, 8))
 
 df_elec_cut = df_elec[cut_elec].copy()
@@ -88,29 +88,25 @@ df_mc_cut["weights"] = df_mc_cut["weight"] * normfac * prescale_factor
 # -----------------------------------------------------
 
 custom_bins = {
-    "H.gtr.dp":            dict(num_bins=100, min=-10, max=10),
-    "H.cal.etottracknorm": dict(num_bins=100, min=0.8, max=1.225),
-    "H.gtr.ph":            dict(num_bins=200, min=-0.025, max=0.025),
-    "H.gtr.th":            dict(num_bins=100, min=-0.075, max=0.075),
-    "H.gtr.x":             dict(num_bins=100, min=-0.5, max=0.20),
-    "H.gtr.y":             dict(num_bins=100, min=-1, max=1.25),
-    "H.kin.Q2":            dict(num_bins=100, min=2.7, max=3.9),
-    "H.kin.x_bj":          dict(num_bins=100, min=0.2, max=0.3),
-    "H.kin.W":             dict(num_bins=100, min=3.15, max=3.4),
-    "H.cer.npeSum":        dict(num_bins=100, min=0, max=20),
+    "H_gtr_dp":            dict(num_bins=100, min=-10, max=10),
+    "H_cal_etottracknorm": dict(num_bins=100, min=0.8, max=1.225),
+    "H_gtr_ph":            dict(num_bins=200, min=-1, max=1),
+    "H_gtr_th":            dict(num_bins=100, min=-1, max=1),
+    "H_kin_Q2":            dict(num_bins=100, min=0, max=10),
+    "H_kin_x_bj":          dict(num_bins=100, min=0, max=10),
+    "H_kin_W":             dict(num_bins=100, min=0, max=10),
+    "H_cer_npeSum":        dict(num_bins=100, min=0, max=20),
 }
 
 wide_bins = {k: dict(num_bins=100, min=-100, max=100) for k in custom_bins}
 
 variable_mc_map = {
-    "H.gtr.dp": "hsdelta",
-    # "H.gtr.ph": "hsphi", <---- still working on the mapping!
-    # "H.gtr.th": "hsth",
-    # "H.gtr.x": "hsx",
-    # "H.gtr.y": "hsy",
-    "H.kin.Q2": "q2",
-    "H.kin.x_bj": "xb",
-    "H.kin.W": "w"
+    "H_gtr_dp": "hsdelta",
+    "H_gtr_ph": "hsyptar",
+    "H_gtr_th": "hsxptar",
+    "H_kin_Q2": "q2",
+    "H_kin_x_bj": "xb",
+    "H_kin_W": "w"
 }
 
 # --- Functions ---
@@ -256,7 +252,7 @@ def add_summary_table_pdf_subtracted_vs_mc(pdf, integrals_summary, target, run_n
 # --- Run ---
 with PdfPages(f"Yield_Comparisons_{target}.pdf") as pdf:
     save_all_subtracted_vs_mc_plots(pdf, df_elec_cut, df_pos_cut, df_mc_cut, custom_bins, use_log_scale=USE_LOG_SCALE)
-    integrals_summary = compute_integrals_summary_subtracted_vs_mc(df_elec_cut, df_pos_cut, df_mc_cut, wide_bins)
+    integrals_summary = compute_integrals_summary_subtracted_vs_mc(df_elec_cut, df_pos_cut, df_mc_cut, custom_bins)
     add_summary_table_pdf_subtracted_vs_mc(pdf, integrals_summary, target, run_number_electron, run_number_positron)
 
 print(f"Saved Yield_Comparisons_{target}.pdf with plots and integral summary table")

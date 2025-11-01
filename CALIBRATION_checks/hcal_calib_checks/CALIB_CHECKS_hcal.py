@@ -248,7 +248,7 @@ data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
 counts, bin_edges = np.histogram(df_cut["H_cal_etottracknorm"], bins=data_bins)
 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-fit_min, fit_max = 0.90, 1.00
+fit_min, fit_max = 0.90, 1.10
 fit_mask = (bin_centers >= fit_min) & (bin_centers <= fit_max)
 
 x_fit = bin_centers[fit_mask]
