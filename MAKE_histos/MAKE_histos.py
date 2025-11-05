@@ -9,21 +9,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import boost_histogram as bh
 import os
-
-runnum = input(f"Input run number: ")
+import re
 
 # -----------------------------------------------------
 # File paths
 # -----------------------------------------------------
-skimmed_rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0"
-skimmed_hms_pattern = f"skimmed_hms_coin_replay_production_{runnum}_-1.root"
+rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0"
 
-rootfile_path = f"{skimmed_rootfile_dir}/{skimmed_hms_pattern}"
-
-# =====================================================================
-# Handling user inputs
-# =====================================================================
-
+# -----------------------------------------------------
+# Handling user inputs to determine setting
+# -----------------------------------------------------
 selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
 if not selected_type:
     selected_type = f"hmsdis"
@@ -55,9 +50,24 @@ if not selected_target_shortname:
     print(f"Unknown target: {selected_target}.  Please try again.")
     exit(1)
 
-output_filepath = f"{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
+input_settings_filepath = f"../FILTER_type/{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
 
+output_dir = f"{selected_target_shortname.upper()}"
 
+# -----------------------------------------------------
+# Defining branches, using uproot to put them in data frames
+# -----------------------------------------------------
+runnums = []
+weight = []
+charge = []
+
+with open(input_settings_filepath, "r") as infile:
+    next(infile) # Skipping the header line here
+    for line in infile:
+        parts = line.strip().split("\t")
+        runnums.append(parts[0])
+        charge.append(parts[12])
+        weight.append(parts[19])
 
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
@@ -73,19 +83,9 @@ branches = ["H_gtr_dp",
             "H_kin_W",
             "H_cer_npeSum"]
 
-
-df = pd.DataFrame(uproot.open(rootfile_path)["T"].arrays(branches, library="np"))
-print(f"Dataframe loaded: {len(df)} rows")
-
-data_cut = (df["H_gtr_dp"].between(-8, 8) & (df["H_cer_npeSum"] > 2) & (df["H_cal_etottracknorm"] > 0.8))
-
-df_cut = df[data_cut].copy()
-print(f"Data cuts have been applied: {data_cut}")
-
 # -----------------------------------------------------
 # Binning
 # -----------------------------------------------------
-
 custom_bins = {
 "H_gtr_dp": dict(binnum = 100, min = -10, max = 10),
 "H_cal_etottracknorm": dict(binnum = 100, min = 0.8, max = 1.225),
@@ -99,19 +99,42 @@ custom_bins = {
 "H_cer_npeSum": dict(binnum = 100, min = 0, max = 20)
 }
 
+# -----------------------------------------------------
+# Histogram and csv creation
+# -----------------------------------------------------
+hist_data = {}
+bin_edges_dict = {}
+
 for var, bins in custom_bins.items():
     axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
-    hist = bh.Histogram(axis, storage=bh.storage.Weight())
-    hist.fill(df_cut[var])
-    bin_edges = hist.axes[0].edges
-    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-    view = hist.view()
-    counts = view.value
-    errors = np.sqrt(view.variance)
-    rows = []
-    for i in range(len(counts)):
-        rows.append((bin_centers[i], counts[i], errors[i]))
-    hist_df = pd.DataFrame(rows, columns=["bin_center", "counts", "errors"])
-    output_filepath = f"{target}/HMS_{runnum}_{target}_{var}_histo.csv"
+    bin_edges_dict[var] = axis.edges
+    hist_data[var] = []
+
+for i, runnum in enumerate(runnums):
+     rootfile_path = f"{rootfile_dir}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
+     if not os.path.exists(rootfile_path):
+         print(f"WARNING: Missing {rootfile_path}, skipping...")
+         continue
+     df = pd.DataFrame(uproot.open(rootfile_path)["T"].arrays(branches, library = "np"))
+     data_cut = (df["H_gtr_dp"].between(-8, 8) & (df["H_cer_npeSum"] > 2) & (df["H_cal_etottracknorm"] > 0.8))
+     df_cut = df[data_cut].copy()
+
+     run_weight = float(weight[i])
+
+     for var, bins in custom_bins.items():
+         axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
+         hist = bh.Histogram(axis, storage=bh.storage.Weight())
+         hist.fill(df_cut[var], weight=np.full(len(df_cut[var]), run_weight))
+
+         counts = hist.view().value
+         hist_data[var].append([runnum]+counts.tolist())
+
+for var, rows in hist_data.items():
+    bin_edges = bin_edges_dict[var]
+    bin_labels = [f"bin_{i}" for i in range(len(bin_edges) - 1)]
+    columns = ["runnum"] + bin_labels
+    hist_df = pd.DataFrame(rows, columns=columns)
+    output_filename = f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_histo.csv"
+    output_filepath = f"{output_dir}/{output_filename}"
     hist_df.to_csv(output_filepath, index=False)
-    print(f"Histogram for {var} saved to {output_filepath}") 
+    print(f"Saved {output_filename} to {output_filepath}.")
