@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, re
+import os, re, sys
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -101,12 +101,11 @@ available_types = [str(rt) for rt in df["run_type"].unique() if isinstance(rt, s
 available_types = [rt for rt in available_types if rt != 'nan']
 available_types = sorted(available_types)
 
-print("Available run types with types:")
-for i, val in enumerate(df["run_type"].unique()):
-    print(i, repr(val), type(val))
-print("\nAvailable run types:", ", ".join(available_types))
-
-selected = input("Enter comma-separated run types to include (or 'all'): ").strip().lower()
+if len(sys.argv) > 1:
+    selected = sys.argv[1]
+else:
+    print("\nAvailable run types:", ", ".join(available_types))
+    selected = input("Enter comma-separated run types to include (or 'all'): ").strip().lower()
 
 if selected != "all":
     chosen_types = [s.strip() for s in selected.split(",")]
@@ -119,26 +118,47 @@ if df.empty:
 df["runnum_int"] = df["runnum"].astype(int)
 df = df.sort_values("runnum_int")
 
-plt.figure(figsize=(10, 6))
+df["residual"] = df["fit_mean"] - 1.0
+
+# ---------------------------------------------
+# Plotting mean stabilities
+# ---------------------------------------------
+fig, (ax_top, ax_bot) = plt.subplots(nrows = 2, ncols = 1, figsize = (8, 8), gridspec_kw = {"height_ratios": [3, 1]})
 
 for run_type, subdf in df.groupby("run_type"):
-    plt.errorbar(
-        subdf["runnum_int"].to_numpy(),
-        subdf["fit_mean"].to_numpy(),
-        yerr=subdf["mean_err"].to_numpy(),
-        fmt="o",
-        capsize=0,
-        elinewidth = 0.5,
-        markersize = 3,
-        label=run_type
-    )
-plt.axhline(1.0, color='navy', linestyle='--', linewidth=1.2, label='y = 1')
+    ax_top.errorbar(subdf["runnum_int"].to_numpy(),
+                    subdf["fit_mean"].to_numpy(),
+                    yerr=subdf["mean_err"].to_numpy(),
+                    fmt="o", capsize=0, elinewidth = 0.5,
+                    markersize = 3, label=run_type)
+    
+ax_top.axhline(1.0, color='navy', linestyle='--', linewidth=1.2, label='y = 1')
 
-plt.xlabel("Run Number", fontsize=13)
-plt.ylabel("Fit Mean", fontsize=13)
-plt.title(f"SHMS Calorimeter Fitted E/p vs Run Number\nSelected Run Types: {selected}", fontsize=15)
-plt.legend(title="Run Type", fontsize=10)
-plt.grid(True, linestyle="--", alpha=0.6)
+ax_top.set_ylabel("Fit Mean", fontsize=13)
+
+ax_top.legend(title="Run Type", fontsize=10)
+
+ax_top.set_xlabel("Run Number", fontsize = 13)
+
+ax_top.grid(True, linestyle="--", alpha=0.6)
+
+ax_bot.hist(df["residual"], bins = 100, histtype = 'stepfilled', alpha = 0.7, color = 'navy', edgecolor = 'black')
+
+ax_bot.axvline(0, color = 'black', linestyle = '--', linewidth = 1)
+
+sigma = df["residual"].std()
+
+for n in [1, 2, 3]:
+    ax_bot.axvline(n * sigma, color = 'red', linestyle = '--', alpha = 0.6)
+    ax_bot.axvline(-n * sigma, color = 'red', linestyle = '--', alpha = 0.6)
+
+ax_bot.set_xlabel("Residual (Fit Mean − 1.0)", fontsize=13)
+
+ax_bot.set_ylabel("Count", fontsize=13)
+
+ax_bot.grid(True, linestyle="--", alpha=0.6)
+
+plt.tight_layout()
 
 if selected == "all":
     prefix = "all"
@@ -146,34 +166,46 @@ else:
     prefix = "_".join(chosen_types)
     prefix = prefix.replace(" ", "_").replace("/", "-")
 
-outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_pcal.png"
+outfile_mean = f"STABILITY_plots/{prefix}_mean_stability_pcal.png"
+
+fig.suptitle(f"SHMS Calorimeter Fitted E/p Mean vs Run Number and Residuals\nSelected Run Types: {selected}", fontsize=15)
 
 plt.tight_layout()
-plt.savefig(outfile, dpi = 300)
+plt.savefig(outfile_mean, dpi = 300)
 plt.close()
-print(f"Saved plot to {outfile}")
+print(f"Saved plot to {outfile_mean}")
 
-#########################
-
-plt.figure(figsize=(10, 6))
+# ---------------------------------------------
+# Plotting width stabilities
+# ---------------------------------------------
+fig, (ax_top, ax_bot) = plt.subplots(nrows = 2, ncols = 1, figsize = (8, 8), gridspec_kw = {"height_ratios": [3, 1]})
 
 for run_type, subdf in df.groupby("run_type"):
-    plt.errorbar(
-        subdf["runnum_int"].to_numpy(),
-        subdf["fit_sigma"].to_numpy(),
-        yerr=subdf["sigma_err"].to_numpy(),
-        fmt="o",
-        capsize=0,
-        elinewidth = 0.5,
-        markersize = 3,
-        label=run_type
-    )
+    ax_top.errorbar(subdf["runnum_int"].to_numpy(),
+                    subdf["fit_sigma"].to_numpy(),
+                    yerr=subdf["sigma_err"].to_numpy(),
+                    fmt="o", capsize=0, elinewidth = 0.5,
+                    markersize = 3, label=run_type)
 
-plt.xlabel("Run Number", fontsize=13)
-plt.ylabel("Fit Mean", fontsize=13)
-plt.title(f"SHMS Calorimeter Fitted E/p Sigma vs Run Number\nSelected Run Types: {selected}", fontsize=15)
-plt.legend(title="Run Type", fontsize=10)
-plt.grid(True, linestyle="--", alpha=0.6)
+ax_top.set_ylabel("Fit Width", fontsize=13)
+
+ax_top.legend(title="Run Type", fontsize=10)
+
+ax_top.set_xlabel("Run Number", fontsize = 13)
+
+ax_top.grid(True, linestyle="--", alpha=0.6)
+
+ax_bot.hist(df["residual"], bins = 100, histtype = 'stepfilled', alpha = 0.7, color = 'navy', edgecolor = 'black')
+
+ax_bot.axvline(0, color = 'black', linestyle = '--', linewidth = 1)
+
+ax_bot.set_xlabel("Residual (Fit Mean − 1.0)", fontsize=13)
+
+ax_bot.set_ylabel("Count", fontsize=13)
+
+ax_bot.grid(True, linestyle="--", alpha=0.6)
+
+plt.tight_layout()
 
 if selected == "all":
     prefix = "all"
@@ -181,9 +213,80 @@ else:
     prefix = "_".join(chosen_types)
     prefix = prefix.replace(" ", "_").replace("/", "-")
 
-outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_sigma_pcal.png"
+outfile_sigma = f"STABILITY_plots/{prefix}_width_stability_pcal.png"
+
+fig.suptitle(f"SHMS Calorimeter Fitted E/p Width vs Run Number and Residuals\nSelected Run Types: {selected}", fontsize=15)
 
 plt.tight_layout()
-plt.savefig(outfile, dpi = 300)
+plt.savefig(outfile_sigma, dpi = 300)
 plt.close()
-print(f"Saved plot to {outfile}")
+print(f"Saved plot to {outfile_sigma}")
+
+# plt.figure(figsize=(10, 6))
+
+# for run_type, subdf in df.groupby("run_type"):
+#     plt.errorbar(
+#         subdf["runnum_int"].to_numpy(),
+#         subdf["fit_mean"].to_numpy(),
+#         yerr=subdf["mean_err"].to_numpy(),
+#         fmt="o",
+#         capsize=0,
+#         elinewidth = 0.5,
+#         markersize = 3,
+#         label=run_type
+#     )
+# plt.axhline(1.0, color='navy', linestyle='--', linewidth=1.2, label='y = 1')
+
+# plt.xlabel("Run Number", fontsize=13)
+# plt.ylabel("Fit Mean", fontsize=13)
+
+# plt.legend(title="Run Type", fontsize=10)
+# plt.grid(True, linestyle="--", alpha=0.6)
+
+# if selected == "all":
+#     prefix = "all"
+# else:
+#     prefix = "_".join(chosen_types)
+#     prefix = prefix.replace(" ", "_").replace("/", "-")
+
+# outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_pcal.png"
+
+# plt.tight_layout()
+# plt.savefig(outfile, dpi = 300)
+# plt.close()
+# print(f"Saved plot to {outfile}")
+
+# #########################
+
+# plt.figure(figsize=(10, 6))
+
+# for run_type, subdf in df.groupby("run_type"):
+#     plt.errorbar(
+#         subdf["runnum_int"].to_numpy(),
+#         subdf["fit_sigma"].to_numpy(),
+#         yerr=subdf["sigma_err"].to_numpy(),
+#         fmt="o",
+#         capsize=0,
+#         elinewidth = 0.5,
+#         markersize = 3,
+#         label=run_type
+#     )
+
+# plt.xlabel("Run Number", fontsize=13)
+# plt.ylabel("Fit Mean", fontsize=13)
+# plt.title(f"SHMS Calorimeter Fitted E/p Sigma vs Run Number\nSelected Run Types: {selected}", fontsize=15)
+# plt.legend(title="Run Type", fontsize=10)
+# plt.grid(True, linestyle="--", alpha=0.6)
+
+# if selected == "all":
+#     prefix = "all"
+# else:
+#     prefix = "_".join(chosen_types)
+#     prefix = prefix.replace(" ", "_").replace("/", "-")
+
+# outfile = f"STABILITY_plots/{prefix}_etottracknorm_vs_runnum_sigma_pcal.png"
+
+# plt.tight_layout()
+# plt.savefig(outfile, dpi = 300)
+# plt.close()
+# print(f"Saved plot to {outfile}")

@@ -19,16 +19,16 @@ if len(sys.argv) > 1:
 else:
     runnum = input("Input the run number you wish to analyze: ")
 
-root_directory = f"/work/hallc/c-rsidis/skimfiles/pass0"
-coin_pattern = f"skimmed_coin_replay_production_{runnum}_-1.root"
-shms_pattern = f"skimmed_shms_coin_replay_production_{runnum}_-1.root"
-hms_pattern = f"skimmed_hms_coin_replay_production_{runnum}_-1.root"
+root_directory = f"/volatile/hallc/c-rsidis/relder/ROOTfiles"
+coin_pattern = f"coin_replay_production_{runnum}_-1.root"
+shms_pattern = f"shms_coin_replay_production_{runnum}_-1.root"
+hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"
 auxfiles_runlist_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat"
 
 d_calo_fp = 292.64 # distance from focal plane to calorimeter face
 
-branches = ["P_dc_x_fp", "P_dc_y_fp", "P_dc_xp_fp", "P_dc_yp_fp",
-            "P_gtr_dp", "P_ngcer_npeSum", "P_cal_etottracknorm"]
+branches = ["P.dc.x_fp", "P.dc.y_fp", "P.dc.xp_fp", "P.dc.yp_fp",
+            "P.gtr.dp", "P.ngcer.npeSum", "P.cal.etottracknorm"]
 
 # --------------------------------------------------------------------------
 # Trying to open root files, basically filters out HMS replays
@@ -67,15 +67,15 @@ except uproot.exceptions.KeyInFileError as e:
 # --------------------------------------------------------------------------
 # Setting up variables for plotting
 # --------------------------------------------------------------------------
-cuts = ((df["P_gtr_dp"] > -15) & (df["P_gtr_dp"] < 27) & (df["P_ngcer_npeSum"] > 2)) & (df["P_cal_etottracknorm"] > 0)
+cuts = ((df["P.gtr.dp"] > -15) & (df["P.gtr.dp"] < 27) & (df["P.ngcer.npeSum"] > 2)) & (df["P.cal.etottracknorm"] > 0)
 
 df_cut = df[cuts]
 
-xcalo = ((df_cut["P_dc_x_fp"]) + (df_cut["P_dc_xp_fp"])*d_calo_fp)
+xcalo = ((df_cut["P.dc.x_fp"]) + (df_cut["P.dc.xp_fp"])*d_calo_fp)
 
-ycalo = ((df_cut["P_dc_y_fp"]) + (df_cut["P_dc_yp_fp"])*d_calo_fp)
+ycalo = ((df_cut["P.dc.y_fp"]) + (df_cut["P.dc.yp_fp"])*d_calo_fp)
 
-weight = df_cut["P_cal_etottracknorm"]
+weight = df_cut["P.cal.etottracknorm"]
 
 finite_mask = np.isfinite(xcalo) & np.isfinite(ycalo) & np.isfinite(weight)
 
@@ -212,7 +212,7 @@ for i in range(numcols + 1):
 # -----------------------------------------------------------------------------
 bin_min, bin_max, bin_num = 0, 2, 200
 data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
-counts, bin_edges = np.histogram(df_cut["P_cal_etottracknorm"], bins=data_bins)
+counts, bin_edges = np.histogram(df_cut["P.cal.etottracknorm"], bins=data_bins)
 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
 fit_min, fit_max = 0.90, 1.10
@@ -251,7 +251,7 @@ except:
     amp_fit = mean_fit = sigma_fit = amp_err = mean_err = sigma_err = np.nan
 
 # Now plotting to the second pad
-ax2.hist(df_cut["P_cal_etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
+ax2.hist(df_cut["P.cal.etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
 x_plot = np.linspace(fit_min, fit_max, 500)
 
 if not fit_failed:
