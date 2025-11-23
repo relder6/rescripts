@@ -1,4 +1,4 @@
-#Run#	Date	tStart	Ebeam	Ibeam	Target	HMSp	HMSth	SHMSp	SHMSth	PrescaleSettings	RunType	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	ELREAL	Eff	Weight	nu	Q2	epsilon	xbj	fan_mean	fancorr	# Comments
+#Run#	Date	tStart	Ebeam	Ibeam	Target	HMSp	HMSth	SHMSp	SHMSth	PrescaleSettings	RunType	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	ELREAL	Eff	Weight	nu	Q2	epsilon	xbj	fan_mean	boilcorr	# Comments
 24891	08/15	00:38	10.6716	55	LH2	-3.642	16.750	+6.538	7.510	-1,-1,-1,3,-1,-1	HMSDIS	46638.561	-1.0	+5.0	1.000	2177366	10885182	0.9983	+5.008514	7.030	3.298	0.031	0.250	34.0917	1.0	# 0
 24922	08/15	22:47	10.6716	38	LH2	-3.642	16.750	+4.868	7.510	-1,-1,-1,2,-1,-1	HMSDIS	26449.420	-1.0	+3.0	0.998	2077430	6246295	0.9984	+3.011560	7.030	3.298	0.031	0.250	34.1505	1.0	# 0
 24978	08/17	14:37	10.6716	18	LH2	-3.642	16.750	+3.632	7.510	-1,-1,-1,1,-1,-1	HMSDIS	16831.675	-1.0	+2.0	0.997	1997352	4007919	0.9986	+2.009429	7.030	3.298	0.031	0.250	34.2792	1.0	# 0

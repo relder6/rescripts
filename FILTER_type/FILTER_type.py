@@ -123,13 +123,13 @@ if os.path.exists(run_info_filepath):
             try:
                 runnum = int(row["run"])
                 if selected_type in ["lh2", "ld2"]:
-                    fan_current_correction = row.get("fan_current_correction", "N/A")
+                    boil_corr = row.get("boil_corr", "N/A")
                 else:
-                    fan_current_correction = 1.0
+                    boil_corr = 1.0
                 fan_mean = row.get("fan_mean", "N/A")
 
                 runinfo_lookup[runnum] = {
-                    "fan_current_correction": fan_current_correction,
+                    "boil_corr": boil_corr,
                     "fan_mean": fan_mean
                     }
                 
@@ -142,7 +142,7 @@ if os.path.exists(run_info_filepath):
         
 with open(output_filepath, "w") as outfile:
     # Write header
-    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\txbj\tfan_mean\tfancorr\t# Comments\n")
+    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\txbj\tfan_mean\tboilcorr\t# Comments\n")
     
     for line in filtered_lines:
         parts = re.split(r'\s+', line.strip())
@@ -213,7 +213,6 @@ with open(output_filepath, "w") as outfile:
         if livetime_unformatted > 1:
             livetime_unformatted = 1
         livetime = float(livetime_unformatted)
-        weight = float(ps) / ((float(livetime) * float(trackeff)))
         nu = abs(float(ebeam)) - abs(float(hms_p))
         hms_th_float = float(hms_th)
         hms_th_rad = np.deg2rad(hms_th_float)
@@ -221,12 +220,13 @@ with open(output_filepath, "w") as outfile:
         epsilon = 1 / (1 + 2 * (1 + (nu**2 / Q2)) * np.tan(hms_th_rad/ 2))**2
         runnum_int = int(runnum)
         runinfo_val = runinfo_lookup.get(runnum_int, {"fan_current_correction": "N/A", "fan_mean":"N/A"})
-        fan_current_correction = runinfo_val["fan_current_correction"]
+        boil_corr = runinfo_val["boil_corr"]
+        weight = float(boil_corr) * float(ps) / ((float(livetime) * float(trackeff)))
         fan_mean = runinfo_val["fan_mean"]
         xbj = Q2 / (2 * 0.938 * (abs(float(nu))))
         # Composing the tsv line
         # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, nu, Q2,  comment ])
-        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", f"{xbj:.3f}", fan_mean, fan_current_correction, comment]))
+        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", f"{xbj:.3f}", fan_mean, boil_corr, comment]))
 
         outfile.write(tsv_line + "\n")
 

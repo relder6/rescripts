@@ -229,7 +229,6 @@ for var, rows in hist_data.items():
     if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         mc_err_row = ["MC", "0", "0"] + mc_hist_err[var]
         hist_err_df.loc[0] = mc_err_row
-        continue
    
     hist_err_df.index = range(len(hist_df))
     

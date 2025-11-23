@@ -1,4 +1,4 @@
-#Run#	Date	tStart	Ebeam	Ibeam	Target	HMSp	HMSth	SHMSp	SHMSth	PrescaleSettings	RunType	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	ELREAL	Eff	Weight	nu	Q2	epsilon	xbj	fan_mean	fancorr	# Comments
+#Run#	Date	tStart	Ebeam	Ibeam	Target	HMSp	HMSth	SHMSp	SHMSth	PrescaleSettings	RunType	BCM2CutCh	Ps3	Ps4	tLive	PTrigs	ELREAL	Eff	Weight	nu	Q2	epsilon	xbj	fan_mean	boilcorr	# Comments
 23938	07/19	03:26	8.5831	10	Cu	-1.531	29.045	-2.615	7.865	-1,-1,-1,0,-1,-1	HMSDIS	11332.596	-1.0	+1.0	1.000	1360135	1359908	0.9987	+1.001302	7.052	3.305	0.012	0.250	37.786	1.0	# 0
 23976	07/20	00:17	8.5831	15	Cu	-1.531	29.045	-6.538	7.865	-1,-1,-1,0,-1,-1	HMSDIS	8477.139	-1.0	+1.0	0.999	1026720	1027756	0.9987	+1.002312	7.052	3.305	0.012	0.250	41.362	1.0	# HMS SINGLE;current recorded as 10,15uA
 24052	07/21	22:35	8.5831	20	Cu	-1.531	29.045	-4.868	7.865	-1,-1,-1,0,-1,-1	HMSDIS	16383.742	-1.0	+1.0	0.999	1977154	1978795	0.9987	+1.002133	7.052	3.305	0.012	0.250	39.0309	1.0	# 0
