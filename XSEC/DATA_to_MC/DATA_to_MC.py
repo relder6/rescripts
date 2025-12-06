@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
+import os
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -58,7 +59,7 @@ selected_target_title_longname = selected_target_shortname_to_title_longname.get
 # -----------------------------------------------------
 base_dir = f"../MAKE_csvs/{selected_target_shortname.upper()}"
     
-variables = ["H_gtr_dp", "H_gtr_ph", "H_gtr_th", "H_kin_Q2", "H_kin_x_bj", "H_kin_W"]
+variables = ["H_gtr_dp", "H_gtr_ph", "H_gtr_th", "H_kin_Q2", "H_kin_x_bj", "H_kin_W", "H_gtr_p"]
 
 pdf_output = f"PDFs/DATA_to_MC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
 pp = PdfPages(pdf_output)
@@ -134,6 +135,18 @@ if selected_target_shortname in {"al", "c", "cu"}:
         bin_width = bin_left_edges[1] - bin_left_edges[0]
         bin_centers = bin_left_edges + 0.5 * bin_width
 
+        # --------------------------------------------------
+        # Saving binned yield ratios to output CSV
+        # --------------------------------------------------
+        output_dir = f"{selected_target_shortname.upper()}"
+        output_filepath = f"{output_dir}/DATA_to_MC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}.csv"
+        os.makedirs(output_dir, exist_ok=True)
+
+        df_output = pd.DataFrame({"bin_center": bin_centers, "Y_sub": Y_sub, "E_sub": E_sub, "Y_mc": Y_mc, "E_mc": E_mc, "radio": ratio, "ratio_err": ratio_err})
+
+        df_output.to_csv(output_filepath, index=False)
+        print(f"Saved binned yield CSV → {output_filepath}")
+        
         # --------------------------------------------------
         # Plotting
         # --------------------------------------------------

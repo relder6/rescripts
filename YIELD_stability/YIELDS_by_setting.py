@@ -59,13 +59,16 @@ input_settings_filepath = f"../FILTER_type/{selected_target_shortname.upper()}/{
 # Extracting information
 # ===============================
 
+#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\txbj\tfan_mean\tboilcorr\t# Comments
+
 runnums = []
 prescale3_factors = []
 prescale4_factors = []
-beam_charges = []
+beam_charge = []
 tracking_effs = []
 livetimes = []
 hmsmomentum = []
+weights = []
 
 with open(input_settings_filepath, "r") as infile:
     next(infile) # Skipping the header line here
@@ -74,10 +77,11 @@ with open(input_settings_filepath, "r") as infile:
         runnums.append(parts[0])
         prescale3_factors.append(parts[13])
         prescale4_factors.append(parts[14])
-        beam_charges.append(parts[12])
+        beam_charge.append(parts[12])
         livetimes.append(parts[15])
         tracking_effs.append(parts[18])
         hmsmomentum.append(parts[6])
+        weights.append(parts[19])
 
 # ===============================
 # Initializing histogram information
@@ -93,7 +97,7 @@ results = []
 
 print(f"Starting analysis for {len(runnums)} runs...")
 
-for idx, (runnum, ps3, ps4, charge, eff, livetime) in enumerate(tqdm(zip(runnums, prescale3_factors, prescale4_factors, beam_charges, tracking_effs, livetimes), total=len(runnums))):
+for idx, (runnum, ps3, ps4, charge, eff, livetime, weight) in enumerate(tqdm(zip(runnums, prescale3_factors, prescale4_factors, beam_charge, tracking_effs, livetimes, weights), total=len(runnums))):
     ps3_val = float(ps3)
     ps4_val = float(ps4)
 
@@ -132,11 +136,11 @@ for idx, (runnum, ps3, ps4, charge, eff, livetime) in enumerate(tqdm(zip(runnums
                 (data["H.gtr.dp"] < 8.0)
                 )
 
-            weight = 1000 * ps / ( float(livetime) * float(charge) * float(eff))
-            weights = np.full_like(data[delta], weight, dtype = float)
+            # Applying per run weights & charge normalizations, and converting to yield/mC
+            run_weight = np.full_like(data[delta], float(weight) * 1000 / float(charge), dtype = float)
 
             hist.reset()
-            hist.fill(data[delta][cut], weight=weights[cut])
+            hist.fill(data[delta][cut], weight=run_weight[cut])
 
             delta_yield = hist.sum().value
             delta_yield_err = hist.sum().variance**0.5

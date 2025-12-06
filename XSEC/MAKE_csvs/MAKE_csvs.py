@@ -91,9 +91,9 @@ with open(input_settings_filepath, "r") as infile:
 branches = ["H_gtr_dp", "H_cal_etottracknorm", "H_gtr_ph",
             "H_gtr_th", "H_gtr_x", "H_gtr_y",
             "H_kin_Q2", "H_kin_x_bj", "H_kin_W",
-            "H_cer_npeSum"]
+            "H_cer_npeSum", "H_gtr_p"]
 
-branches_mc = ["hsdelta", "hsyptar", "hsxptar", "q2", "xb", "w", "weight"]
+branches_mc = ["hsdelta", "hsyptar", "hsxptar", "q2", "xb", "w", "weight", "eprime"]
 
 variable_mc_map = {
     "H_gtr_dp": "hsdelta",
@@ -101,20 +101,34 @@ variable_mc_map = {
     "H_gtr_th": "hsxptar",
     "H_kin_Q2": "q2",
     "H_kin_x_bj": "xb",
-    "H_kin_W": "w"
+    "H_kin_W": "w",
+    "H_gtr_p": "eprime"
     }
 
 # -----------------------------------------------------
 # Binning
 # -----------------------------------------------------
-custom_bins = {
-"H_gtr_dp": dict(binnum = 100, min = -10.000, max = 10.000),
-"H_gtr_ph": dict(binnum = 100, min = -0.050, max = 0.050),
-"H_gtr_th": dict(binnum = 100, min = -0.100, max = 0.100),
-"H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
-"H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
-"H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
-}
+if selected_beam_pass == "4":
+    custom_bins = {
+        "H_gtr_dp": dict(binnum = 100, min = -10.000, max = 10.000),
+        "H_gtr_ph": dict(binnum = 100, min = -0.050, max = 0.050),
+        "H_gtr_th": dict(binnum = 100, min = -0.100, max = 0.100),
+        "H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
+        "H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
+        "H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
+        "H_gtr_p": dict(binnum = 151, min = 1.195, max = 2.705)
+    }
+    
+if selected_beam_pass == "5":
+    custom_bins = {
+        "H_gtr_dp": dict(binnum = 100, min = -10.000, max = 10.000),
+        "H_gtr_ph": dict(binnum = 100, min = -0.050, max = 0.050),
+        "H_gtr_th": dict(binnum = 100, min = -0.100, max = 0.100),
+        "H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
+        "H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
+        "H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
+        "H_gtr_p": dict(binnum = 351, min = 2.995, max = 6.505)
+    }
 
 # -----------------------------------------------------
 # Data histogram and csv creation

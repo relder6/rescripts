@@ -12,9 +12,18 @@ input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_F
 report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
 run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
 
-skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860, 24482, 24496, 25013]
+skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
+                24292,24291,24309,24482,24496,24498,24483,24495,24481,
+                24293,24319,24290,24308,24456,25081,24967,24455,24438,
+                24440,25047,23938,24294,24333,24911,24027,23963,25406,
+                23934,23918,25416,25407,25417,23919
+]
 # Runs 23853 - 23860 are commissioning runs; skipping these for now
-# What is happening with yields on 24482, 24496, 25013?
+# What is happening with yields on 25013?
+# Low current runs, 24292,24291,24309,24482,24496,24498,24483,24495,24481,
+# 24293,24319,24290,24308,24456,25081,24967,24455,24438,24440,25047,23938,
+# 24294,24333,24911,24027,23963,25406,23934,23918,25416,25407,25417,23919
+
 
 # =====================================================================
 # Handling user inputs
