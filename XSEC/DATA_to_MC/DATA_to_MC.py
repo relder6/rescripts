@@ -142,7 +142,15 @@ if selected_target_shortname in {"al", "c", "cu"}:
         output_filepath = f"{output_dir}/DATA_to_MC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}.csv"
         os.makedirs(output_dir, exist_ok=True)
 
-        df_output = pd.DataFrame({"bin_center": bin_centers, "Y_sub": Y_sub, "E_sub": E_sub, "Y_mc": Y_mc, "E_mc": E_mc, "radio": ratio, "ratio_err": ratio_err})
+        df_output = pd.DataFrame({
+            "bin_center": np.round(bin_centers, 4),
+            "Y_sub": Y_sub,
+            "E_sub": E_sub,
+            "Y_mc": Y_mc,
+            "E_mc": E_mc,
+            "ratio": ratio,
+            "ratio_err": ratio_err
+        })
 
         df_output.to_csv(output_filepath, index=False)
         print(f"Saved binned yield CSV → {output_filepath}")
@@ -297,6 +305,27 @@ if selected_target_shortname in {"ld2", "lh2"}:
         bin_width = bin_left_edges[1] - bin_left_edges[0]
         bin_centers = bin_left_edges + 0.5 * bin_width
 
+        # --------------------------------------------------
+        # Saving binned yield ratios to output CSV
+        # --------------------------------------------------
+        output_dir = f"{selected_target_shortname.upper()}"
+        output_filepath = f"{output_dir}/DATA_to_MC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}.csv"
+        os.makedirs(output_dir, exist_ok=True)
+
+        df_output = pd.DataFrame({
+            "bin_center": np.round(bin_centers, 4),
+            "Y_sub": Y_sub,
+            "E_sub": E_sub,
+            "Y_mc": Y_mc,
+            "E_mc": E_mc,
+            "ratio": ratio,
+            "ratio_err": ratio_err
+        })
+
+        df_output.to_csv(output_filepath, index=False)
+        print(f"Saved binned yield CSV → {output_filepath}")
+        
+        
         # --------------------------------------------------
         # Plotting
         # --------------------------------------------------

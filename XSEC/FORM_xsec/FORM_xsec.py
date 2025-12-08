@@ -53,3 +53,83 @@ selected_target_shortname_to_title_longname = {
     "dummy":"Dummy"}
 
 selected_target_title_longname = selected_target_shortname_to_title_longname.get(selected_target_shortname)
+
+# -----------------------------------------------------
+# Filepaths
+# -----------------------------------------------------
+model_xsec_filepath = f"../MODEL_xsec/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_model_xsec.csv"
+
+data_to_mc_filepath = f"../DATA_to_MC/{selected_target_shortname.upper()}/DATA_to_MC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_H_gtr_p.csv"
+
+xsec_pdf_output = f"PDFs/XSEC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
+
+# -----------------------------------------------------
+# Preparing Dataframes
+# -----------------------------------------------------
+df_model_xsec = pd.read_csv(model_xsec_filepath)
+
+df_data_to_mc = pd.read_csv(data_to_mc_filepath).rename(columns={"bin_center": "eprime"})
+
+# -----------------------------------------------------
+# Forming the xsec
+# -----------------------------------------------------
+df_model_xsec["modelxsec"] = pd.to_numeric(df_model_xsec["modelxsec"], errors="coerce")
+
+df_merged = pd.merge(df_data_to_mc, df_model_xsec, on="eprime", how="inner")
+
+df_merged["xsec_exp"] = df_merged["ratio"] * df_merged["modelxsec"]
+
+# -----------------------------------------------------
+# Error propagation
+# -----------------------------------------------------
+df_merged["xsec_exp_err"] = df_merged["xsec_exp"] * (df_merged["ratio_err"] / df_merged["ratio"])
+
+df_merged["xsec_exp"] = df_merged["xsec_exp"].replace([np.inf, -np.inf], np.nan)
+df_merged["xsec_exp_err"] = df_merged["xsec_exp_err"].replace([np.inf, -np.inf], np.nan)
+
+# -----------------------------------------------------
+# Save output csv
+# -----------------------------------------------------
+output_dir = f"{selected_target_shortname.upper()}"
+os.makedirs(output_dir, exist_ok=True)
+
+output_filepath = f"{output_dir}/XSEC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.csv"
+
+final_columns = ["eprime", "theta", "xbj", "q2", "w", "modelxsec", "xsec_exp", "xsec_exp_err"]
+
+df_final = df_merged[final_columns]
+
+df_final.to_csv(output_filepath, index=False)
+
+print(f"Saved → {output_filepath}")
+
+# -----------------------------------------------------
+# Plotting
+# -----------------------------------------------------
+vars_to_plot = {
+    "eprime": df_final["eprime"].to_numpy(),
+    "xbj": df_final["xbj"].to_numpy(),
+    "q2": df_final["q2"].to_numpy(),
+    "w": df_final["w"].to_numpy(),
+    }
+
+xsec_final = df_final["xsec_exp"].to_numpy()
+xsec_err_final = df_final["xsec_exp_err"].to_numpy()
+
+pp = PdfPages(xsec_pdf_output)
+
+for var, val in vars_to_plot.items():
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    ax.errorbar(val, xsec_final, yerr=xsec_err_final, fmt='o', markersize=3, capsize=0)
+    ax.xaxis.set_major_locator(ticker.AutoLocator())
+    ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+    ax.set_xlabel(f"{var}")
+    ax.set_ylabel("Cross Section (ub/GeV/sr)")
+    ax.set_title(f"{selected_target_title_longname} {selected_type.upper()} Experimental Cross Section at {selected_beam_pass}Pass")
+    ax.grid()
+
+    pp.savefig(fig)
+    plt.close(fig)
+    
+pp.close()
+print(f"Saved PDF → {xsec_pdf_output}")
