@@ -111,7 +111,7 @@ vars_to_plot = {
     "xbj": df_final["xbj"].to_numpy(),
     "q2": df_final["q2"].to_numpy(),
     "w": df_final["w"].to_numpy(),
-    }
+}
 
 xsec_final = df_final["xsec_exp"].to_numpy()
 xsec_err_final = df_final["xsec_exp_err"].to_numpy()
@@ -120,16 +120,25 @@ pp = PdfPages(xsec_pdf_output)
 
 for var, val in vars_to_plot.items():
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
-    ax.errorbar(val, xsec_final, yerr=xsec_err_final, fmt='o', markersize=3, capsize=0)
+
+    mask = ~np.isnan(xsec_final)
+    model_masked = df_final["modelxsec"].to_numpy().copy()
+    model_masked[~mask] = np.nan
+
+    
+    ax.errorbar(val, xsec_final, yerr=xsec_err_final, fmt='o', markersize=3, capsize=0, label = "Data")
+    ax.plot(val, model_masked, linestyle = ":", marker = "", label = "Model")
     ax.xaxis.set_major_locator(ticker.AutoLocator())
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.set_xlabel(f"{var}")
     ax.set_ylabel("Cross Section (ub/GeV/sr)")
     ax.set_title(f"{selected_target_title_longname} {selected_type.upper()} Experimental Cross Section at {selected_beam_pass}Pass")
     ax.grid()
-
+    ax.legend()
+    ymax = np.nanmax([xsec_final, df_final["modelxsec"].to_numpy()])
+    ax.set_ylim(0, ymax*1.1)
     pp.savefig(fig)
     plt.close(fig)
-    
+
 pp.close()
 print(f"Saved PDF → {xsec_pdf_output}")
