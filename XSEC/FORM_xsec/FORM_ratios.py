@@ -75,7 +75,7 @@ df_num = pd.read_csv(num_csv_filepath)
 
 df_denom = pd.read_csv(denom_csv_filepath)
 
-merge_cols = ["eprime", "theta", "xbj", "q2", "w"]
+merge_cols = ["eprime", "theta", "xbj", "q2", "w", "epsilon"]
 
 num_rename = {col: f"{col}_num" for col in df_num.columns if col not in merge_cols}
 
@@ -115,6 +115,7 @@ vars_to_plot = {
     "xbj": df_merged["xbj"].to_numpy(),
     "q2": df_merged["q2"].to_numpy(),
     "w": df_merged["w"].to_numpy(),
+    "epsilon": df_merged["epsilon"].to_numpy(),
     }
 
 xsec_ratio = df_merged["xsec_ratio"].to_numpy()

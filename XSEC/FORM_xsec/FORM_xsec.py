@@ -95,7 +95,7 @@ os.makedirs(output_dir, exist_ok=True)
 
 output_filepath = f"{output_dir}/XSEC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.csv"
 
-final_columns = ["eprime", "theta", "xbj", "q2", "w", "modelxsec", "xsec_exp", "xsec_exp_err"]
+final_columns = ["eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
 
 df_final = df_merged[final_columns]
 
@@ -111,6 +111,7 @@ vars_to_plot = {
     "xbj": df_final["xbj"].to_numpy(),
     "q2": df_final["q2"].to_numpy(),
     "w": df_final["w"].to_numpy(),
+    "epsilon": df_final["epsilon"].to_numpy()
 }
 
 xsec_final = df_final["xsec_exp"].to_numpy()

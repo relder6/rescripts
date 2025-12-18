@@ -13,16 +13,15 @@ report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTIO
 run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
-                24292,24291,24309,24482,24496,24498,24483,24495,24481,
-                24293,24319,24290,24308,24456,25081,24967,24455,24438,
-                24440,25047,23938,24294,24333,24911,24027,23963,25406,
-                23934,23918,25416,25407,25417,23919
+                23918,23919,23934,23938,23963,24027,24290,24291,24292,24293, 24294,24308,24309,
+                24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498, 
+                24911,24967,25047,25081,25406,25407,25416,25417
 ]
 # Runs 23853 - 23860 are commissioning runs; skipping these for now
-# What is happening with yields on 25013?
-# Low current runs, 24292,24291,24309,24482,24496,24498,24483,24495,24481,
-# 24293,24319,24290,24308,24456,25081,24967,24455,24438,24440,25047,23938,
-# 24294,24333,24911,24027,23963,25406,23934,23918,25416,25407,25417,23919
+# Low current runs, 4pass:
+# 23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498
+# Low current runs, 5pass:
+# 
 
 
 # =====================================================================
@@ -121,7 +120,7 @@ with open(output_runnums_filepath, "r") as infile:
     runnums = infile.read().strip().split(",")
 
 # =====================================================================
-# Reading in fan speed correction
+# Reading in fan speed correction and boiling correction
 # =====================================================================
 
 runinfo_lookup = {}
@@ -131,7 +130,7 @@ if os.path.exists(run_info_filepath):
         for row in reader:
             try:
                 runnum = int(row["run"])
-                if selected_type in ["lh2", "ld2"]:
+                if selected_target_shortname in ["lh2", "ld2"]:
                     boil_corr = row.get("boil_corr", "N/A")
                 else:
                     boil_corr = 1.0

@@ -116,7 +116,7 @@ if selected_beam_pass == "4":
         "H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
         "H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
         "H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
-        "H_gtr_p": dict(binnum = 151, min = 1.195, max = 2.705)
+        "H_gtr_p": dict(binnum = 76, min = 1.190, max = 2.71)
     }
     
 if selected_beam_pass == "5":
@@ -127,7 +127,7 @@ if selected_beam_pass == "5":
         "H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
         "H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
         "H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
-        "H_gtr_p": dict(binnum = 351, min = 2.995, max = 6.505)
+        "H_gtr_p": dict(binnum = 176, min = 2.990, max = 6.51)
     }
 
 # -----------------------------------------------------
