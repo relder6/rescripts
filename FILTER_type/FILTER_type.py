@@ -31,7 +31,7 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
 # =====================================================================
 # Handling user inputs
 # =====================================================================
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname = get_common_run_inputs()
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename = get_common_run_inputs()
 
 output_filepath = f"{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
 

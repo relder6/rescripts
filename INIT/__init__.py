@@ -42,4 +42,17 @@ def get_common_run_inputs():
         print(f"Unknown target: {selected_target}.  Please try again.")
         exit(1)
 
-    return selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname
+    selected_target_shortname_to_title_longname = {
+        "al":"Aluminum",
+        "c":"Carbon",
+        "cu":"Copper",
+        "opt1":"Optics1",
+        "opt2":"Optics2",
+        "ld2":"Deuterium",
+        "lh2":"Hydrogen",
+        "hole":"Carbon Hole",
+        "dummy":"Dummy"}
+
+    selected_target_titlename = selected_target_shortname_to_title_longname.get(selected_target_shortname)
+
+    return selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename
