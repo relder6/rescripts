@@ -5,63 +5,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
-import os
+import os, re, sys
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)    
+from INIT import get_common_run_inputs
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-if not selected_type:
-    selected_type = "hmsdis"
-
-selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-selected_beam_pass_to_energy_prefix = {
-    "1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."
-}
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
-
-selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
-selected_target_shortcut_to_target_variable = {
-    "al":"al","al13":"al","aluminum":"al",
-    "c":"c","c12":"c","carbon":"c",
-    "cu":"cu","cu29":"cu","copper":"cu",
-    "opt1":"optics1","optics1":"optics1",
-    "opt2":"optics2","optics2":"optics2",
-    "d2":"ld2","ld2":"ld2",
-    "h2":"lh2","lh2":"lh2",
-    "hole":"hole","chole":"hole","c-hole":"hole",
-    "dummy":"dummy","dum":"dummy"
-}
-
-selected_target_shortname = selected_target_shortcut_to_target_variable.get(selected_target)
-if not selected_target_shortname:
-    print(f"Unknown target: {selected_target}.  Please try again.")
-    exit(1)
-    
-selected_target_shortname_to_title_longname = {
-    "al":"Aluminum",
-    "c":"Carbon",
-    "cu":"Copper",
-    "opt1":"Optics1",
-    "opt2":"Optics2",
-    "ld2":"Deuterium",
-    "lh2":"Hydrogen",
-    "hole":"Carbon Hole",
-    "dummy":"Dummy"}
-
-selected_target_title_longname = selected_target_shortname_to_title_longname.get(selected_target_shortname)
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename = get_common_run_inputs()
 
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-model_xsec_filepath = f"../MODEL_xsec/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_model_xsec.csv"
+model_xsec_filepath = f"../MODEL_xsec/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_model_xsec.csv"
 
-data_to_mc_filepath = f"../DATA_to_MC/{selected_target_shortname.upper()}/DATA_to_MC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_H_gtr_p.csv"
+data_to_mc_filepath = f"../DATA_to_MC/{selected_target_shortname.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_H_gtr_p.csv"
 
-xsec_pdf_output = f"PDFs/XSEC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
+xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
 
 # -----------------------------------------------------
 # Preparing Dataframes
@@ -93,7 +55,7 @@ df_merged["xsec_exp_err"] = df_merged["xsec_exp_err"].replace([np.inf, -np.inf],
 output_dir = f"{selected_target_shortname.upper()}"
 os.makedirs(output_dir, exist_ok=True)
 
-output_filepath = f"{output_dir}/XSEC_{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.csv"
+output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.csv"
 
 final_columns = ["eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
 
@@ -119,30 +81,6 @@ xsec_err_final = df_final["xsec_exp_err"].to_numpy()
 
 pp = PdfPages(xsec_pdf_output)
 
-# for var, val in vars_to_plot.items():
-#     fig, ax = plt.subplots(figsize=(8.5, 5.5))
-
-#     mask = ~np.isnan(xsec_final)
-#     model_masked = df_final["modelxsec"].to_numpy().copy()
-#     model_masked[~mask] = np.nan
-
-    
-#     ax.errorbar(val, xsec_final, yerr=xsec_err_final, fmt='o', markersize=3, capsize=0, label = "Data")
-#     ax.plot(val, model_masked, linestyle = ":", marker = "", label = "Model")
-#     ax.xaxis.set_major_locator(ticker.AutoLocator())
-#     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
-#     ax.set_xlabel(f"{var}")
-#     ax.set_ylabel("Cross Section (ub/GeV/sr)")
-#     ax.set_title(f"{selected_target_title_longname} {selected_type.upper()} Experimental Cross Section at {selected_beam_pass}Pass")
-#     ax.grid()
-#     ax.legend()
-#     ymax = np.nanmax([xsec_final, df_final["modelxsec"].to_numpy()])
-#     ax.set_ylim(0, ymax*1.1)
-#     pp.savefig(fig)
-#     plt.close(fig)
-
-# pp.close()
-
 for var, val in vars_to_plot.items():
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8.5, 7.5),
         gridspec_kw={"height_ratios":[3,1], "hspace":0.05}, sharex=True)
@@ -156,7 +94,7 @@ for var, val in vars_to_plot.items():
     ax1.plot(val[mask], model[mask], linestyle=":", label="Model")
 
     ax1.set_ylabel("Cross Section (μb/GeV/sr)")
-    ax1.set_title(f"{selected_target_title_longname} {selected_type.upper()} "
+    ax1.set_title(f"{selected_target_titlename} {selected_run_type.upper()} "
                  f"Experimental Cross Section at {selected_beam_pass} Pass")
     ax1.grid()
     ax1.legend()

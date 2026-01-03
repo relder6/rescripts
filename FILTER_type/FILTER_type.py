@@ -78,7 +78,7 @@ for line in run_lines:
         beam_match and runnum not in skip_runnums):
         filtered_lines.append(line)
         
-output_runnums_filepath = f"RUNNUMS/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
+output_runnums_filepath = f"CSVs/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
 
 # =====================================================================
 # Writing runnums to csv

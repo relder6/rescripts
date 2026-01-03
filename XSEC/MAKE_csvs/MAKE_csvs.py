@@ -8,50 +8,23 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import boost_histogram as bh
-import os
-import re
+import os, re, sys
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)    
+from INIT import get_common_run_inputs
+
+# -----------------------------------------------------
+# Handling user inputs to determine setting
+# -----------------------------------------------------
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename = get_common_run_inputs()
 
 # -----------------------------------------------------
 # File paths
 # -----------------------------------------------------
 rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0"
 mc_dir = "/work/hallc/c-rsidis/relder/mc-single-arm"
-
-# -----------------------------------------------------
-# Handling user inputs to determine setting
-# -----------------------------------------------------
-selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-if not selected_type:
-    selected_type = f"hmsdis"
-    
-selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-selected_beam_pass_to_energy_prefix = {"1": "2.",
-                                       "2": "4.",
-                                       "3": "6.",
-                                       "4": "8.",
-                                       "5": "10."}
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
-
-selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
-selected_target_shortcut_to_target_variable = {"al":"al","al13":"al","aluminum":"al",
-                                               "c":"c","c12":"c","carbon":"c",
-                                               "cu":"cu","cu29":"cu","copper":"cu",
-                                               "opt1":"optics1","optics1":"optics1",
-                                               "opt2":"optics2","optics2":"optics2",
-                                               "d2":"ld2","ld2":"ld2",
-                                               "h2":"lh2","lh2":"lh2",
-                                               "hole":"hole","chole":"hole","c-hole":"hole",
-                                               "dummy":"dummy","dum":"dummy",
-                                               }
-selected_target_shortname = selected_target_shortcut_to_target_variable.get(selected_target)
-if not selected_target_shortname:
-    print(f"Unknown target: {selected_target}.  Please try again.")
-    exit(1)
-
-input_settings_filepath = f"../../FILTER_type/{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
+input_settings_filepath = f"../../FILTER_type/{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
 
 output_dir = f"{selected_target_shortname.upper()}"
 
@@ -59,11 +32,11 @@ output_dir = f"{selected_target_shortname.upper()}"
 # Reading in monte-carlo report to obtain normfac
 # -----------------------------------------------------
 if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
-    mc_filepath = f"{mc_dir}/worksim/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.root"
+    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.root"
     if not os.path.exists(mc_filepath):
-        print(f"WARNING:\tNo mc-single-arm generated root file found for {selected_type}_{selected_beam_pass}_{selected_target_shortname}. Exiting...")
+        print(f"WARNING:\tNo mc-single-arm generated root file found for {selected_run_type}_{selected_beam_pass}_{selected_target_shortname}. Exiting...")
         exit(1)
-    mc_report_filepath = f"{mc_dir}/outfiles/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}.out"
+    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.out"
     with open(mc_report_filepath, "r") as infile:
         normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
     normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
@@ -174,15 +147,15 @@ if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
     df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
     mc_cut = (df_mc["hsdelta"].between(-8, 8))
     df_mc_cut = df_mc[mc_cut].copy()
-    print("DEBUG: df_mc shape:", df_mc.shape)
-    print("DEBUG: df_mc columns:", df_mc.columns.tolist())
-    print("DEBUG: hsdelta stats:",
-          "min=", np.min(df_mc["hsdelta"]),
-          "max=", np.max(df_mc["hsdelta"]))
+    # print("DEBUG: df_mc shape:", df_mc.shape)
+    # print("DEBUG: df_mc columns:", df_mc.columns.tolist())
+    # print("DEBUG: hsdelta stats:",
+    #       "min=", np.min(df_mc["hsdelta"]),
+    #       "max=", np.max(df_mc["hsdelta"]))
 
-    print("DEBUG: df_mc_cut shape:", df_mc_cut.shape)
-    if df_mc_cut.empty:
-        print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
+    # print("DEBUG: df_mc_cut shape:", df_mc_cut.shape)
+    # if df_mc_cut.empty:
+    #     print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
 
 
     mc_hist_data = {}
@@ -207,13 +180,13 @@ for var, bins in custom_bins.items():
             print("Weights branch not found.  Exiting...")
             print(df_mc_cut.columns.tolist())
             exit(1)
-        print(f"\nDEBUG: var={var}, mc_var={mc_var}")
-        print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
-        print("DEBUG: bins for this variable:", bins["min"], bins["max"])
-        print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
-        hist_mc.fill(df_mc_cut[mc_var].values, weight=event_weights)
-        print("DEBUG: hist sum after fill:", hist_mc.sum())
-        print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
+        # print(f"\nDEBUG: var={var}, mc_var={mc_var}")
+        # print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
+        # print("DEBUG: bins for this variable:", bins["min"], bins["max"])
+        # print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
+        # hist_mc.fill(df_mc_cut[mc_var].values, weight=event_weights)
+        # print("DEBUG: hist sum after fill:", hist_mc.sum())
+        # print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
 
         mc_hist_data[var] = hist_mc.view().value.tolist()
         mc_hist_err[var] = np.sqrt(hist_mc.view().variance).tolist()
@@ -234,7 +207,7 @@ for var, rows in hist_data.items():
     else:
         hist_df.index = range(len(hist_df))
     
-    output_filename = f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_histo.csv"
+    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_histo.csv"
     output_filepath = f"{output_dir}/{output_filename}"
     hist_df.to_csv(output_filepath, index=False)
 
@@ -246,7 +219,7 @@ for var, rows in hist_data.items():
    
     hist_err_df.index = range(len(hist_df))
     
-    output_err_filename = f"{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_err.csv"
+    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_err.csv"
     output_err_filepath = f"{output_dir}/{output_err_filename}"
     hist_err_df.to_csv(output_err_filepath, index=False)
     
