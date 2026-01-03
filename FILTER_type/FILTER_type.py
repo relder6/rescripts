@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
-import os, re
+import os, re, sys
 import numpy as np
 import csv
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)    
+from INIT import get_common_run_inputs
 
 # =====================================================================
 # Defining paths here
@@ -13,7 +17,7 @@ report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTIO
 run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
-                23918,23919,23934,23938,23963,24027,24290,24291,24292,24293, 24294,24308,24309,
+                23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
                 24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498, 
                 24911,24967,25047,25081,25406,25407,25416,25417
 ]
@@ -21,47 +25,15 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
 # Low current runs, 4pass:
 # 23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498
 # Low current runs, 5pass:
-# 
+# 24911,24967,25047,25081,25406,25407,25416,25417
 
 
 # =====================================================================
 # Handling user inputs
 # =====================================================================
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname = get_common_run_inputs()
 
-selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-if not selected_type:
-    selected_type = f"hmsdis"
-    
-selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-selected_beam_pass_to_energy_prefix = {"1": "2.",
-                                       "2": "4.",
-                                       "3": "6.",
-                                       "4": "8.",
-                                       "5": "10."}
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
-
-# selected_angle = input("Enter the desired HMS angle (present options: ): ").strip() #  This is kind of pointless for HMSDIS, only one setting... commenting out
-
-selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
-selected_target_shortcut_to_target_variable = {"al":"al","al13":"al","aluminum":"al",
-                                               "c":"c","c12":"c","carbon":"c",
-                                               "cu":"cu","cu29":"cu","copper":"cu",
-                                               "opt1":"optics1","optics1":"optics1",
-                                               "opt2":"optics2","optics2":"optics2",
-                                               "d2":"ld2","ld2":"ld2",
-                                               "h2":"lh2","lh2":"lh2",
-                                               "hole":"hole","chole":"hole","c-hole":"hole",
-                                               "dummy":"dummy","dum":"dummy",
-                                               }
-selected_target_shortname = selected_target_shortcut_to_target_variable.get(selected_target)
-if not selected_target_shortname:
-    print(f"Unknown target: {selected_target}.  Please try again.")
-    exit(1)
-
-output_filepath = f"{selected_target_shortname.upper()}/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
+output_filepath = f"{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
 
 # =====================================================================
 # Reading auxfiles runlist, filtering and extracting lines
@@ -101,12 +73,12 @@ for line in run_lines:
     runnum = int(parts[0])
     beam_match = ebeam.startswith(beam_prefix)
 
-    if (selected_type == run_type.strip().lower() and
+    if (selected_run_type == run_type.strip().lower() and
         selected_target_shortname.lower() == target_type.strip().lower() and
         beam_match and runnum not in skip_runnums):
         filtered_lines.append(line)
         
-output_runnums_filepath = f"RUNNUMS/{selected_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
+output_runnums_filepath = f"RUNNUMS/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
 
 # =====================================================================
 # Writing runnums to csv
