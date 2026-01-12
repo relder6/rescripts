@@ -1,8 +1,13 @@
-void print_all_canvases(const char* filename = "myfile.root", const char* outpdf = "output.pdf") {
+// To use, do the following:
+// load root
+// .L ROOTtoPDF.C
+// ROOTtoPDF("moveme.root","output.pdf");
+
+void ROOTtoPDF(const char* filename = "moveme.root", const char* outpdf = "output.pdf") {
   // Open the ROOT file
   TFile* f = TFile::Open(filename);
   if (!f || f->IsZombie()) {
-    Error("print_all_canvases", "Cannot open file: %s", filename);
+    Error("ROOTtoPDF", "Cannot open file: %s", filename);
     return;
   }
 

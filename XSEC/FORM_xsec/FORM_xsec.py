@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
+from matplotlib.ticker import PercentFormatter
 import os, re, sys
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if REPO_ROOT not in sys.path:
@@ -88,14 +89,11 @@ for var, val in vars_to_plot.items():
     mask = ~np.isnan(xsec_final)
     model = df_final["modelxsec"].to_numpy()
 
-    ax1.errorbar(val[mask], xsec_final[mask],
-        yerr=xsec_err_final[mask], fmt='o', markersize=3,
-        capsize=0, label="Data")
-    ax1.plot(val[mask], model[mask], linestyle=":", label="Model")
+    ax1.errorbar(val[mask], xsec_final[mask], yerr=xsec_err_final[mask], fmt='o', markersize=3, color='navy', capsize=0, label="Data")
+    ax1.plot(val[mask], model[mask], linestyle=":", color='red', label="Model")
 
     ax1.set_ylabel("Cross Section (μb/GeV/sr)")
-    ax1.set_title(f"{selected_target_titlename} {selected_run_type.upper()} "
-                 f"Experimental Cross Section at {selected_beam_pass} Pass")
+    ax1.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Nuclear Cross Section")
     ax1.grid()
     ax1.legend()
 
@@ -105,12 +103,11 @@ for var, val in vars_to_plot.items():
     residual = (xsec_final - model) / model
     residual_err = xsec_err_final / model
 
-    ax2.errorbar(val[mask], residual[mask],
-        yerr=residual_err[mask], fmt='o', markersize=3, capsize=0)
+    ax2.errorbar(val[mask], residual[mask], yerr=residual_err[mask], fmt='o', markersize=3, capsize=0, color ='darkmagenta')
     ax2.axhline(0.0, color='k', linestyle='--', linewidth=1)
-
+    ax2.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
     ax2.set_xlabel(var)
-    ax2.set_ylabel("Res.")
+    ax2.set_ylabel("Res. %")
     ax2.grid()
 
     ax2.relim()

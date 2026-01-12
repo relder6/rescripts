@@ -156,8 +156,6 @@ if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
     # print("DEBUG: df_mc_cut shape:", df_mc_cut.shape)
     # if df_mc_cut.empty:
     #     print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
-
-
     mc_hist_data = {}
     mc_hist_err = {}
 
@@ -175,7 +173,18 @@ for var, bins in custom_bins.items():
         hist_mc = bh.Histogram(axis, storage=bh.storage.Weight())
 
         if "weight" in df_mc_cut.columns:
-            event_weights = df_mc_cut["weight"].values * normfac
+            deltatmp = df_mc_cut["hsdelta"].values
+
+            h1 = 1.0069
+            h2 = 0.34018e-02
+            h3 = -0.71161e-03
+            h4 = -0.12060e-04
+            h5 = 0.11322e-04
+            h6 = -0.78222e-06
+
+            deltacorr = (h1 + h2 * deltatmp + h3 * deltatmp**2 + h4 * deltatmp**3 + h5 * deltatmp**4 + h6 * deltatmp**5)
+            
+            event_weights = df_mc_cut["weight"].values * normfac * deltacorr
         else:
             print("Weights branch not found.  Exiting...")
             print(df_mc_cut.columns.tolist())
@@ -184,7 +193,7 @@ for var, bins in custom_bins.items():
         # print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
         # print("DEBUG: bins for this variable:", bins["min"], bins["max"])
         # print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
-        # hist_mc.fill(df_mc_cut[mc_var].values, weight=event_weights)
+        hist_mc.fill(df_mc_cut[mc_var].values, weight=event_weights)
         # print("DEBUG: hist sum after fill:", hist_mc.sum())
         # print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
 

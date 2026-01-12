@@ -5,16 +5,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
-import os
+import os, sys
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-selected_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-if not selected_type:
-    selected_type = "hmsdis"
-
-selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
+if len(sys.argv) == 5:
+    selected_run_type = sys.argv[1].strip().lower()
+    selected_beam_pass = sys.argv[2].strip()
+    selected_num = sys.argv[3].strip().lower()
+    selected_denom = sys.argv[4].strip().lower()
+else:
+    selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
+    if not selected_run_type:
+        selected_run_type = "hmsdis"
+    selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
+    selected_num = input("Enter numerator target: ").strip().lower()
+    selected_denom = input("Enter denominator target: ").strip().lower()
+    
 selected_beam_pass_to_energy_prefix = {
     "1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."
 }
@@ -47,26 +55,34 @@ selected_target_shortname_to_title_longname = {
     "dummy":"Dummy"}
 
 # Targets
-selected_num = input("Enter numerator target: ").strip().lower()
 num_short = selected_target_shortcut_to_target_variable.get(selected_num)
 if not num_short:
     print(f"Unknown target: {selected_num}. Please try again.")
     exit(1)
 num_long = selected_target_shortname_to_title_longname[num_short]
     
-selected_denom = input("Enter denominator target: ").strip().lower()
 denom_short = selected_target_shortcut_to_target_variable.get(selected_denom)
 if not denom_short:
     print(f"Unknown target: {selected_denom}. Please try again.")
     exit(1)
 denom_long = selected_target_shortname_to_title_longname[denom_short]
 
+selected_target_shortname_to_AZ = {"al":   (27.0, 13.0),
+                                   "c":    (12.0, 6.0),
+                                   "cu":   (64.0, 29.0),
+                                   "ld2":  (2.0, 1.0),
+                                   "lh2":  (1.0, 1.0)}
+
+num_A, num_Z = selected_target_shortname_to_AZ.get(num_short, (0.0, 0.0))
+denom_A, denom_Z = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
+A_ratio = num_A/ denom_A
+
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-num_csv_filepath = f"{num_short.upper()}/XSEC_{selected_type}_{selected_beam_pass}pass_{num_short}.csv"
+num_csv_filepath = f"{num_short.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{num_short}.csv"
 
-denom_csv_filepath = f"{denom_short.upper()}/XSEC_{selected_type}_{selected_beam_pass}pass_{denom_short}.csv"
+denom_csv_filepath = f"{denom_short.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{denom_short}.csv"
 
 # -----------------------------------------------------
 # Preparing Dataframes
@@ -87,11 +103,21 @@ df_denom = df_denom.rename(columns=denom_rename)
 
 df_merged = pd.merge(df_num, df_denom, on=merge_cols, how="inner")
 
-# Ratio of experimental cross sections
 df_merged["xsec_ratio"] = df_merged["xsec_exp_num"] / df_merged["xsec_exp_denom"]
 
-# Error propagation for ratio: (deltaR / R)^2 = (deltaA / A)^2 + (deltaB / B)^2
 df_merged["xsec_ratio_err"] = df_merged["xsec_ratio"] * np.sqrt((df_merged["xsec_exp_err_num"] / df_merged["xsec_exp_num"])**2 + (df_merged["xsec_exp_err_denom"] / df_merged["xsec_exp_denom"])**2)
+
+df_merged["xsec_ratio_norm"] = df_merged["xsec_ratio"] / A_ratio
+
+df_merged["xsec_ratio_norm_err"] = df_merged["xsec_ratio_err"] / A_ratio
+
+df_merged["num_A"] = num_A
+
+df_merged["num_Z"] = num_Z
+
+df_merged["denom_A"] = denom_A
+
+df_merged["denom_Z"] = denom_Z
 
 # -----------------------------------------------------
 # Save output csv
@@ -99,7 +125,7 @@ df_merged["xsec_ratio_err"] = df_merged["xsec_ratio"] * np.sqrt((df_merged["xsec
 output_dir = "RATIOS"
 os.makedirs(output_dir, exist_ok=True)
 
-output_csv_filepath = f"{output_dir}/XSEC_RATIO_{selected_type}_{selected_beam_pass}pass_{num_short}_to_{denom_short}.csv"
+output_csv_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_short}_to_{denom_short}.csv"
 
 df_merged.to_csv(output_csv_filepath, index=False)
 
@@ -108,7 +134,7 @@ print(f"Saved → {output_csv_filepath}")
 # -----------------------------------------------------
 # Plotting
 # -----------------------------------------------------
-output_pdf_filepath = f"{output_dir}/XSEC_RATIO_{selected_type}_{selected_beam_pass}pass_{num_short}_to_{denom_short}.pdf"
+output_pdf_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_short}_to_{denom_short}.pdf"
 
 vars_to_plot = {
     "eprime": df_merged["eprime"].to_numpy(),
@@ -118,19 +144,19 @@ vars_to_plot = {
     "epsilon": df_merged["epsilon"].to_numpy(),
     }
 
-xsec_ratio = df_merged["xsec_ratio"].to_numpy()
-xsec_ratio_err = df_merged["xsec_ratio_err"].to_numpy()
+xsec_ratio_norm = df_merged["xsec_ratio_norm"].to_numpy()
+xsec_ratio_norm_err = df_merged["xsec_ratio_norm_err"].to_numpy()
 
 pp = PdfPages(output_pdf_filepath)
 
 for var, val in vars_to_plot.items():
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
-    ax.errorbar(val, xsec_ratio, yerr=xsec_ratio_err, fmt='o', markersize=3, capsize=0)
+    ax.errorbar(val, xsec_ratio_norm, yerr=xsec_ratio_norm_err, fmt='o', markersize=6, capsize=0, color='navy')
     ax.xaxis.set_major_locator(ticker.AutoLocator())
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.set_xlabel(f"{var}")
-    ax.set_ylabel("Cross Section Ratio")
-    ax.set_title(f"{num_long} to {denom_long} {selected_type.upper()} Experimental Cross Section Ratio at {selected_beam_pass}Pass")
+    ax.set_ylabel("Cross Section Ratio per Nucleon")
+    ax.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {num_long}/{denom_long} Cross Section Ratio per Nucleon")
     ax.grid()
 
     pp.savefig(fig)

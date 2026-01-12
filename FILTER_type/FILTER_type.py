@@ -17,11 +17,13 @@ report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTIO
 run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
+                25396, 25397,
                 23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
                 24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498, 
                 24911,24967,25047,25081,25406,25407,25416,25417
 ]
 # Runs 23853 - 23860 are commissioning runs; skipping these for now
+# Runs 25396 and 25397 have NEGATIVE YIELDS in my scripts for some reason???!!!
 # Low current runs, 4pass:
 # 23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498
 # Low current runs, 5pass:
