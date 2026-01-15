@@ -5,3 +5,6 @@
 #*#
 .#*
 
+# Potentially large ROOTfiles
+*.root
+

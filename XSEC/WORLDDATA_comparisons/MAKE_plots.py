@@ -6,7 +6,9 @@ import csv
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
-csv_files = ["WorldData.csv", "RME_results.csv", "DG_carbon.csv", "SCALED_RME_results.csv"]
+# csv_files = ["WorldData.csv", "RME_results.csv", "DG_carbon.csv", "SCALED_RME_results.csv"]
+# csv_files = ["WorldData.csv", "SCALED_RME_results.csv"]
+csv_files = ["WorldData.csv", "RME_results.csv"]
 
 targets = {
     "carbon": (12, 6),
