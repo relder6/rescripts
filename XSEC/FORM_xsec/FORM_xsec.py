@@ -7,15 +7,15 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
 from matplotlib.ticker import PercentFormatter
 import os, re, sys
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)    
-from INIT import get_common_run_inputs
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)    
+from INIT.config import get_common_run_inputs
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename = get_common_run_inputs()
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
 # -----------------------------------------------------
 # Filepaths
@@ -53,12 +53,16 @@ df_merged["xsec_exp_err"] = df_merged["xsec_exp_err"].replace([np.inf, -np.inf],
 # -----------------------------------------------------
 # Save output csv
 # -----------------------------------------------------
+
+df_merged["A"] = selected_target_A
+df_merged["Z"] = selected_target_Z
+
 output_dir = f"{selected_target_shortname.upper()}"
 os.makedirs(output_dir, exist_ok=True)
 
 output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.csv"
 
-final_columns = ["eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
+final_columns = ["A", "Z", "eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
 
 df_final = df_merged[final_columns]
 

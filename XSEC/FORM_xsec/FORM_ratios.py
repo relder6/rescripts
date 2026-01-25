@@ -7,6 +7,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
 import os, sys
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)    
+from INIT.jra_nprat import jra_nprat
+
+
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
@@ -67,15 +73,19 @@ if not denom_short:
     exit(1)
 denom_long = selected_target_shortname_to_title_longname[denom_short]
 
-selected_target_shortname_to_AZ = {"al":   (27.0, 13.0),
-                                   "c":    (12.0, 6.0),
-                                   "cu":   (64.0, 29.0),
-                                   "ld2":  (2.0, 1.0),
-                                   "lh2":  (1.0, 1.0)}
+selected_target_shortname_to_AZ = {"al":   (27, 13),
+                                   "c":    (12, 6),
+                                   "cu":   (64, 29),
+                                   "ld2":  (2, 1),
+                                   "lh2":  (1, 1)}
 
-num_A, num_Z = selected_target_shortname_to_AZ.get(num_short, (0.0, 0.0))
-denom_A, denom_Z = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
-A_ratio = num_A/ denom_A
+A_num, Z_num = selected_target_shortname_to_AZ.get(num_short)
+
+N_num = A_num - Z_num
+
+A_denom, Z_denom = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
+
+A_ratio = A_num / A_denom
 
 # -----------------------------------------------------
 # Filepaths
@@ -103,21 +113,27 @@ df_denom = df_denom.rename(columns=denom_rename)
 
 df_merged = pd.merge(df_num, df_denom, on=merge_cols, how="inner")
 
-df_merged["xsec_ratio"] = df_merged["xsec_exp_num"] / df_merged["xsec_exp_denom"]
+df_merged["xsec_ratio"] = df_merged["xsec_exp_num"] / df_merged["xsec_exp_denom"] 
 
 df_merged["xsec_ratio_err"] = df_merged["xsec_ratio"] * np.sqrt((df_merged["xsec_exp_err_num"] / df_merged["xsec_exp_num"])**2 + (df_merged["xsec_exp_err_denom"] / df_merged["xsec_exp_denom"])**2)
+
+# Normalizing per nucleon
 
 df_merged["xsec_ratio_norm"] = df_merged["xsec_ratio"] / A_ratio
 
 df_merged["xsec_ratio_norm_err"] = df_merged["xsec_ratio_err"] / A_ratio
 
-df_merged["num_A"] = num_A
+# Isoscalar corrections
 
-df_merged["num_Z"] = num_Z
+f2rat = np.array([jra_nprat(x, q) for x, q in zip(df_merged["xbj"], df_merged["q2"])])
 
-df_merged["denom_A"] = denom_A
+df_merged["f2rat"] = f2rat
 
-df_merged["denom_Z"] = denom_Z
+df_merged["iso_corr"] = (0.5*(Z_num + N_num) * (1.0 + df_merged["f2rat"]) / (Z_num + N_num * df_merged["f2rat"]))
+
+df_merged["xsec_ratio_final"] = df_merged["xsec_ratio_norm"] * df_merged["iso_corr"]
+
+df_merged["xsec_ratio_final_err"] = df_merged["xsec_ratio_norm_err"] * df_merged["iso_corr"]
 
 # -----------------------------------------------------
 # Save output csv

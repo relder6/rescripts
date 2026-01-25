@@ -3,10 +3,10 @@
 import os, re, sys
 import numpy as np
 import csv
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)    
-from INIT import get_common_run_inputs
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)    
+from INIT.config import get_common_run_inputs
 
 # =====================================================================
 # Defining paths here

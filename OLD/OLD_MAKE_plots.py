@@ -5,10 +5,12 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from matplotlib.widgets import Button
+from datetime import datetime
 
-# csv_files = ["WorldData.csv", "RME_results.csv", "DG_carbon.csv", "SCALED_RME_results.csv"]
-# csv_files = ["WorldData.csv", "SCALED_RME_results.csv"]
-csv_files = ["WorldData.csv", "RME_results.csv"]
+csv_files = ["RME_results.csv", "WorldData.csv", "DG_carbon.csv", "SCALED_RME_results.csv"]
+# csv_files = ["SCALED_RME_results.csv", "WorldData.csv"]
+# csv_files = ["RME_results.csv", "WorldData.csv"]
 
 targets = {
     "carbon": (12, 6),
@@ -61,6 +63,15 @@ selected_target_shortname_to_title_longname = {
     "dummy":"Dummy"}
 
 selected_target_titlename = selected_target_shortname_to_title_longname.get(selected_target_shortname)
+
+selected_target_shortname_to_title_shortname = {
+    "al": "Al",
+    "c": "C",
+    "cu": "Cu",
+    "ld2": "D",
+    "lh2": "H"}
+
+selected_target_title_shortname = selected_target_shortname_to_title_shortname.get(selected_target_shortname)
 
 A, Z = targets[selected_target]
 
@@ -118,19 +129,35 @@ for data in filtered_data:
     
 unique_sources = sorted({d["source"] for d in filtered_data})
 
-
-
 # ----------------------
 # Making the figure here
 # ----------------------
 fig, ax = plt.subplots(figsize=(7, 5))
 plt.subplots_adjust(bottom=0.18, left=0.18)
 
-marker_cycle = ['o', 's', '^', 'v', 'D', 'P', 'X', '*', '<', '>']
+marker_cycle = ['o', 's', '^', 'v', 'P', 'X', '*', '<', '>']
 
-source_to_marker = {src: marker_cycle[i % len(marker_cycle)] for i, src in enumerate(unique_sources)}
+source_to_marker = {}
 
-plt.rcParams['axes.prop_cycle'] = plt.cycler(color=plt.cm.tab10.colors)
+for src in unique_sources:
+    if src == "RME_results.csv":
+        source_to_marker[src] = "D"
+    else:
+        source_to_marker[src] = marker_cycle.pop(0)
+
+color_cycle = ["#000000",  # black
+               "#e41a1c",  # red
+               "#377eb8",  # blue
+               "#4daf4a",  # green
+               "#984ea3",  # purple
+               "#ff7f00",  # orange
+               "#a65628",  # brown
+               "#f781bf",  # pink
+]
+
+plt.rcParams['axes.prop_cycle'] = plt.cycler(color=color_cycle)
+
+color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 lines = {}
 
@@ -141,6 +168,8 @@ for exp, points_all in experiments.items():
         by_source.setdefault(p["source"], []).append(p)
 
     for src, points in by_source.items():
+        color = color_cycle[len(lines) % len(color_cycle)]
+        lines[(exp, src)] = True
         x = np.array([p["xbj"] for p in points])
         y = np.array([p["ratio"] for p in points])
         yerr = np.array([p["TotErrAbs"] for p in points])
@@ -148,11 +177,13 @@ for exp, points_all in experiments.items():
         order = np.argsort(x)
         x, y, yerr = x[order], y[order], yerr[order]
 
-        ax.errorbar(x, y, yerr=yerr, fmt=source_to_marker[src], linestyle='none', markersize=4, capsize=0, markerfacecolor='none', markeredgewidth=1.1, label=exp)
+        markersize = 4 if src == "RME_results.csv" else 3
+
+        ax.errorbar(x, y, yerr=yerr, fmt=source_to_marker[src], linestyle='none', markersize=markersize, capsize=0, markerfacecolor=color, markeredgewidth=1.1, color = color, label=exp)
 
 ax.set_xlabel(r"$x_{Bj}$")
-ax.set_ylabel("Ratio")
-ax.set_title(f"{selected_target_titlename} World Data Comparison")
+ax.set_ylabel(rf"$(\sigma_{selected_target_A}/{selected_target_A})/(\sigma_D/2)$")
+# ax.set_title(f"{selected_target_titlename} World Data Comparison")
 ax.legend()
 ax.grid(alpha=0.3)
 
@@ -214,6 +245,33 @@ slider_xmin.on_changed(update)
 slider_xmax.on_changed(update)
 slider_ymin.on_changed(update)
 slider_ymax.on_changed(update)
+
+ax_save = plt.axes([0.01, 0.01, 0.1, 0.05])  # [left, bottom, width, height]
+btn_save = Button(ax_save, "Save PNG", color='lightgray', hovercolor='0.975')
+
+def save_png(event):
+    # Hide sliders and button temporarily
+    for s in [slider_xmin, slider_xmax, slider_ymin, slider_ymax]:
+        s.ax.set_visible(False)
+    ax_save.set_visible(False)
+
+    # Ensure PNGs directory exists
+    os.makedirs("PNGs", exist_ok=True)
+
+    # Save with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_path = os.path.join("PNGs", f"{selected_target_shortname}_{timestamp}.png")
+    fig.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    # Restore sliders and button
+    for s in [slider_xmin, slider_xmax, slider_ymin, slider_ymax]:
+        s.ax.set_visible(True)
+    ax_save.set_visible(True)
+
+    print(f"Saved figure as {save_path}")
+
+btn_save.on_clicked(save_png)
+
 
 plt.show()
                 

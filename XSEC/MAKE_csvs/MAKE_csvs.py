@@ -9,15 +9,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import boost_histogram as bh
 import os, re, sys
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)    
-from INIT import get_common_run_inputs
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)    
+from INIT.config import get_common_run_inputs, get_data_cuts
 
 # -----------------------------------------------------
 # Handling user inputs to determine setting
 # -----------------------------------------------------
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename = get_common_run_inputs()
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
 # -----------------------------------------------------
 # File paths
@@ -110,6 +110,8 @@ hist_data = {}
 hist_err_data = {}
 bin_edges_dict = {}
 
+cuts = get_data_cuts()
+
 for var, bins in custom_bins.items():
     axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
     bin_edges_dict[var] = axis.edges
@@ -122,7 +124,9 @@ for i, runnum in enumerate(runnums):
          print(f"WARNING: Missing {rootfile_path}, skipping...")
          continue
      df = pd.DataFrame(uproot.open(rootfile_path)["T"].arrays(branches, library = "np"))
-     data_cut = (df["H_gtr_dp"].between(-8, 8) & (df["H_cer_npeSum"] > 2) & (df["H_cal_etottracknorm"] > 0.8))
+     data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                 (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
+                 (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]))
      df_cut = df[data_cut].copy()
 
      run_weight = float(weight[i])
