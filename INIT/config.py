@@ -68,7 +68,8 @@ def get_common_run_inputs():
                                        "c":    (12, 6),
                                        "cu":   (64, 29),
                                        "ld2":  (2,  1),
-                                       "lh2":  (1,  1)}
+                                       "lh2":  (1,  1),
+                                       "dummy": (0, 0)}
     
     selected_target_A, selected_target_Z = selected_target_shortname_to_AZ.get(selected_target_shortname)
 
