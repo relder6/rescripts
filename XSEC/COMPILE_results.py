@@ -50,7 +50,7 @@ for filepath in csv_files:
 
 df_all = pd.concat(all_rows, ignore_index=True)
 
-output_csv = "RME_results.csv"
+output_csv = "../COMPARISON_plots/CSVs/RME_results.csv"
 
 df_all.to_csv(output_csv, index=False)
 

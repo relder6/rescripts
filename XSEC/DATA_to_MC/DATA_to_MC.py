@@ -14,7 +14,7 @@ from INIT.config import get_common_run_inputs
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename = get_common_run_inputs()
+selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
 # -----------------------------------------------------
 # Files
@@ -180,42 +180,52 @@ if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2"}:
         
         fig, (ax_top, ax_bot) = plt.subplots(2,1,figsize=(8.5,11/2), gridspec_kw={'height_ratios':[3,1]}, sharex=True)
 
-        # Always plot main data and MC scatter points
-        ax_top.errorbar(bin_centers, Yield_sub, yerr=Err_sub, fmt='o', markersize=3, color='navy', label="Data")
-        ax_top.errorbar(bin_centers, Yield_mc,  yerr=Err_mc, fmt='o', markersize=3, color='red',  label="MC")
-
         # Enhanced info for H_gtr_dp only
         if var == "H_gtr_dp":
+            Yield_tot = np.nansum(Yield_elec) + np.nansum(Yield_pos)
             Yield_elec_tot = np.nansum(Yield_elec)
+            Yield_elec_frac = Yield_elec_tot / Yield_tot
             Yield_pos_tot  = np.nansum(Yield_pos)
+            Yield_pos_frac = Yield_pos_tot / Yield_tot
             Yield_sub_tot  = np.nansum(Yield_sub)
-            pos_frac   = 100.0 * Yield_pos_tot / Yield_elec_tot if Yield_elec_tot > 0 else np.nan
-            
-            ax_top.errorbar(bin_centers[valid], Yield_elec[valid], yerr=Err_elec[valid], fmt='o', markersize=3, color='darkorange', label='e⁻ yield')
-            ax_top.errorbar(bin_centers[valid], Yield_pos[valid],  yerr=Err_pos[valid],  fmt='o', markersize=3, color='darkgreen',  label='e⁺ yield')
-            
-            textstr = (f"Total e⁻ yield: {Yield_elec_tot:8.2f}\n"
-                       f"Total e⁺ yield: {Yield_pos_tot:8.2f}\n"
-                       f"Data (e⁻ - e⁺) :     {Yield_sub_tot:8.2f}\n"
-                       f"Total MC:       {np.nansum(Yield_mc):8.2f}\n"
-                       f"e⁺ fraction:    {pos_frac:6.2f} %\n"
-                       f"Data/MC ratio:  {100.0 * np.nansum(Yield_sub)/np.nansum(Yield_mc):6.2f} %")
+            Yield_elec_plot = np.where(valid, Yield_elec, np.nan)
+            Err_elec_plot   = np.where(valid, Err_elec, np.nan)
+            Yield_pos_plot  = np.where(valid, Yield_pos, np.nan)
+            Err_pos_plot    = np.where(valid, Err_pos, np.nan)
 
-            ax_top.text(0.02, 0.75, textstr, transform=ax_top.transAxes, fontsize=10,
-                        verticalalignment='top', bbox=dict(boxstyle="round", facecolor="white", alpha=0.9))
-            
-            plt.tight_layout()
+            ax_top.errorbar(bin_centers, Yield_sub, yerr=Err_sub, fmt='o', markersize=3, color='navy', label=f"Data (e⁻ - e⁺): {Yield_sub_tot:8.2f}")
+            ax_top.errorbar(bin_centers, Yield_mc,  yerr=Err_mc, fmt='o', markersize=3, color='red',  label=f"MC: {np.nansum(Yield_mc):8.2f}")
+            ax_top.errorbar(bin_centers, Yield_elec_plot, yerr=Err_elec_plot, fmt='o', markersize=3, color='darkorange', label=f"e⁻ yield: {Yield_elec_tot:8.2f}")
+            ax_top.errorbar(bin_centers, Yield_pos_plot,  yerr=Err_pos_plot,  fmt='o', markersize=3, color='darkgreen',  label=f"e⁺ yield: {Yield_pos_tot:8.2f}")
+
+            # Add a "dummy plot" that will only appear in the legend as a horizontal line
+            ax_top.plot([0], [0], linestyle="", color="none", label=f"Total (e⁻ + e⁺): {np.nansum(Yield_elec)+np.nansum(Yield_pos):.2f}")
+            ax_top.plot([0], [0], linestyle="", color="none", label=f"e⁺ / (e⁻ + e⁺): {100*Yield_pos_frac:.2f}%")
+            ax_top.plot([0], [0], linestyle="", color="none", label=f"Data/MC ratio: {100*np.nansum(Yield_sub)/np.nansum(Yield_mc):.2f}%")
+
+            handles, labels = ax_top.get_legend_handles_labels()
+            order = [3, 4, 5, 6, 0, 1, 2]
+            ax_top.legend([handles[i] for i in order], [labels[i] for i in order], loc='best', fontsize=10)
+
+            ax_bot.set_ylim(0.90,1.10)
+
+        else:
+            ax_top.errorbar(bin_centers, Yield_sub, yerr=Err_sub, fmt='o', markersize=3, color='navy', label="Data")
+            ax_top.errorbar(bin_centers, Yield_mc,  yerr=Err_mc, fmt='o', markersize=3, color='red',  label="MC")
+            ax_top.legend(loc='best', fontsize=10)
+
+            ax_bot.set_ylim(0.75,1.25)
 
         # Bottom panel: ratio
         ax_bot.errorbar(bin_centers[valid], ratio[valid], yerr=ratio_err[valid], fmt='o', markersize=3, color='darkmagenta', label = 'Data/MC Ratio')
         ax_bot.axhline(1, color='gray', linestyle='--')
-        ax_bot.set_ylabel("Data/MC"); ax_bot.set_ylim(0.75,1.25)
+        ax_bot.set_ylabel("Data/MC")
         ax_bot.set_xlabel(var); ax_bot.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
         ax_bot.grid()
 
         ax_top.set_ylabel("Charge-Normalized Weighted Counts")
         ax_top.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} {var}: Data (e⁻ - e⁺) to MC")
-        ax_top.grid(); ax_top.legend(loc='upper right')
+        ax_top.grid()
 
         fig.tight_layout(); fig.subplots_adjust(top=0.93, bottom=0.12, hspace=0.05)
         pp.savefig(fig); plt.close(fig)

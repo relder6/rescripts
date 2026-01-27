@@ -6,8 +6,17 @@ import os, sys, re
 def get_data_cuts():
     return {"H_gtr_dp_min_cut": -8.0,
             "H_gtr_dp_max_cut": 8.0,
-            "H_cer_npeSum_cut": 2.0,
-            "H_cal_etottracknorm_cut": 0.8}
+            "H_cer_npeSum_cut": 1.5,
+            "H_cal_etottracknorm_cut": 0.7}
+
+# =====================================================================
+# Data Cuts
+# =====================================================================
+def get_common_values():
+    return {"ebeam_4pass": 8.5831,
+            "ebeam_5pass": 10.6716,
+            "angle_4pass": 29.045,
+            "angle_5pass": 16.75}
 
 # =====================================================================
 # User Input Processing Logic

@@ -149,7 +149,7 @@ if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
     mc_file = uproot.open(mc_filepath)
     mc_tree = mc_file["h10"]
     df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
-    mc_cut = (df_mc["hsdelta"].between(-8, 8))
+    mc_cut = (df_mc["hsdelta"]between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]))
     df_mc_cut = df_mc[mc_cut].copy()
     # print("DEBUG: df_mc shape:", df_mc.shape)
     # print("DEBUG: df_mc columns:", df_mc.columns.tolist())
