@@ -10,9 +10,7 @@ from datetime import datetime
 # ----------------------------------------------
 # CSV files
 # ----------------------------------------------
-csv_files = ["CSVs/RME_results.csv", "CSVs/WorldData.csv", "CSVs/DG_carbon.csv", "CSVs/DG_copper.csv"]
-# csv_files = ["CSVs/SCALED_RME_results.csv", "CSVs/WorldData.csv"]
-# csv_files = ["CSVs/RME_results.csv", "CSVs/WorldData.csv"]
+csv_files = ["CSVs/RME_emc_results.csv", "CSVs/WorldData.csv", "CSVs/DG_emc.csv"]
 
 # ----------------------------------------------
 # Target definitions, mapping, selection
@@ -66,12 +64,12 @@ for filepath in csv_files:
         for row in reader:
             try:
                 all_data.append({
-                    "exp": row["Exp"].strip().upper(),
+                    "exp": row["exp"].strip().upper(),
                     "A": float(row["A"]),
                     "Z": float(row["Z"]),
-                    "xbj": float(row["x"]),
-                    "ratio": float(row["Ratio"]),
-                    "TotErrAbs": float(row["TotalErrorAbs"]),
+                    "xbj": float(row["xbj"]),
+                    "emc_ratio": float(row["emc_ratio"]),
+                    "emc_ratio_err": float(row["emc_ratio_err"]),
                     "source": os.path.basename(filepath)
                 })
             except (ValueError, KeyError):
@@ -112,13 +110,13 @@ for exp, points_all in experiments.items():
         color = color_cycle[len(lines) % len(color_cycle)]
         lines[(exp, src)] = True
         x = np.array([p["xbj"] for p in points])
-        y = np.array([p["ratio"] for p in points])
-        yerr = np.array([p["TotErrAbs"] for p in points])
+        y = np.array([p["emc_ratio"] for p in points])
+        yerr = np.array([p["emc_ratio_err"] for p in points])
         order = np.argsort(x)
         x, y, yerr = x[order], y[order], yerr[order]
-        ms = 4 if src=="RME_results.csv" else 3
+        ms = 4 if src=="RME_emc_results.csv" else 3
         ax.errorbar(x, y, yerr=yerr, fmt=source_to_marker[src], linestyle='none',
-                    markersize=ms, capsize=0, markerfacecolor=color, markeredgewidth=1.1,
+                    markersize=ms, capsize=0, markerfacecolor='none', markeredgewidth=1.1,
                     color=color, label=exp)
 
 ax.set_xlabel(r"$x_{bj}$", fontsize = 14)
@@ -127,7 +125,7 @@ ax.legend()
 ax.grid(alpha=0.3)
 
 xmin, xmax = min(p["xbj"] for p in filtered_data), max(p["xbj"] for p in filtered_data)
-ymin, ymax = min(p["ratio"] - p["TotErrAbs"] for p in filtered_data), max(p["ratio"] + p["TotErrAbs"] for p in filtered_data)
+ymin, ymax = min(p["emc_ratio"] - p["emc_ratio_err"] for p in filtered_data), max(p["emc_ratio"] + p["emc_ratio_err"] for p in filtered_data)
 pad_frac = 0.05
 ax.set_xlim(xmin - pad_frac*(xmax-xmin), xmax + pad_frac*(xmax-xmin))
 ax.set_ylim(ymin - pad_frac*(ymax-ymin), ymax + pad_frac*(ymax-ymin))

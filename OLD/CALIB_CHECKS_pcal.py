@@ -19,7 +19,7 @@ if len(sys.argv) > 1:
 else:
     runnum = input("Input the run number you wish to analyze: ")
 
-root_directory = f"/volatile/hallc/c-rsidis/relder/ROOTfiles"
+root_directory = f"/lustre24/expphy/volatile/hallc/c-rsidis/cmorean/replay_pass0_1/ROOTfiles"
 coin_pattern = f"coin_replay_production_{runnum}_-1.root"
 shms_pattern = f"shms_coin_replay_production_{runnum}_-1.root"
 hms_pattern = f"hms_coin_replay_production_{runnum}_-1.root"

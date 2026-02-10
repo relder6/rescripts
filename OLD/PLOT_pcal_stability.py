@@ -175,52 +175,52 @@ plt.savefig(outfile_mean, dpi = 300)
 plt.close()
 print(f"Saved plot to {outfile_mean}")
 
-# ---------------------------------------------
-# Plotting width stabilities
-# ---------------------------------------------
-fig, (ax_top, ax_bot) = plt.subplots(nrows = 2, ncols = 1, figsize = (8, 8), gridspec_kw = {"height_ratios": [3, 1]})
+# # ---------------------------------------------
+# # Plotting width stabilities
+# # ---------------------------------------------
+# fig, (ax_top, ax_bot) = plt.subplots(nrows = 2, ncols = 1, figsize = (8, 8), gridspec_kw = {"height_ratios": [3, 1]})
 
-for run_type, subdf in df.groupby("run_type"):
-    ax_top.errorbar(subdf["runnum_int"].to_numpy(),
-                    subdf["fit_sigma"].to_numpy(),
-                    yerr=subdf["sigma_err"].to_numpy(),
-                    fmt="o", capsize=0, elinewidth = 0.5,
-                    markersize = 3, label=run_type)
+# for run_type, subdf in df.groupby("run_type"):
+#     ax_top.errorbar(subdf["runnum_int"].to_numpy(),
+#                     subdf["fit_sigma"].to_numpy(),
+#                     yerr=subdf["sigma_err"].to_numpy(),
+#                     fmt="o", capsize=0, elinewidth = 0.5,
+#                     markersize = 3, label=run_type)
 
-ax_top.set_ylabel("Fit Width", fontsize=13)
+# ax_top.set_ylabel("Fit Width", fontsize=13)
 
-ax_top.legend(title="Run Type", fontsize=10)
+# ax_top.legend(title="Run Type", fontsize=10)
 
-ax_top.set_xlabel("Run Number", fontsize = 13)
+# ax_top.set_xlabel("Run Number", fontsize = 13)
 
-ax_top.grid(True, linestyle="--", alpha=0.6)
+# ax_top.grid(True, linestyle="--", alpha=0.6)
 
-ax_bot.hist(df["residual"], bins = 100, histtype = 'stepfilled', alpha = 0.7, color = 'navy', edgecolor = 'black')
+# ax_bot.hist(df["residual"], bins = 100, histtype = 'stepfilled', alpha = 0.7, color = 'navy', edgecolor = 'black')
 
-ax_bot.axvline(0, color = 'black', linestyle = '--', linewidth = 1)
+# ax_bot.axvline(0, color = 'black', linestyle = '--', linewidth = 1)
 
-ax_bot.set_xlabel("Residual (Fit Mean − 1.0)", fontsize=13)
+# ax_bot.set_xlabel("Residual (Fit Mean − 1.0)", fontsize=13)
 
-ax_bot.set_ylabel("Count", fontsize=13)
+# ax_bot.set_ylabel("Count", fontsize=13)
 
-ax_bot.grid(True, linestyle="--", alpha=0.6)
+# ax_bot.grid(True, linestyle="--", alpha=0.6)
 
-plt.tight_layout()
+# plt.tight_layout()
 
-if selected == "all":
-    prefix = "all"
-else:
-    prefix = "_".join(chosen_types)
-    prefix = prefix.replace(" ", "_").replace("/", "-")
+# if selected == "all":
+#     prefix = "all"
+# else:
+#     prefix = "_".join(chosen_types)
+#     prefix = prefix.replace(" ", "_").replace("/", "-")
 
-outfile_sigma = f"STABILITY_plots/{prefix}_width_stability_pcal.png"
+# outfile_sigma = f"STABILITY_plots/{prefix}_width_stability_pcal.png"
 
-fig.suptitle(f"SHMS Calorimeter Fitted E/p Width vs Run Number and Residuals\nSelected Run Types: {selected}", fontsize=15)
+# fig.suptitle(f"SHMS Calorimeter Fitted E/p Width vs Run Number and Residuals\nSelected Run Types: {selected}", fontsize=15)
 
-plt.tight_layout()
-plt.savefig(outfile_sigma, dpi = 300)
-plt.close()
-print(f"Saved plot to {outfile_sigma}")
+# plt.tight_layout()
+# plt.savefig(outfile_sigma, dpi = 300)
+# plt.close()
+# print(f"Saved plot to {outfile_sigma}")
 
 # plt.figure(figsize=(10, 6))
 

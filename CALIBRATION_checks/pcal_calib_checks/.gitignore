@@ -2,3 +2,6 @@ COIN/
 SHMS/
 *.dat
 *.png
+pass*/
+ERR_log/*
+DAT/*

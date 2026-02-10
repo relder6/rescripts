@@ -118,6 +118,7 @@ if os.path.exists(run_info_filepath):
             except (ValueError, KeyError):
                 continue
 
+            
 # =====================================================================
 # Reading in report files and compiling the tsv
 # =====================================================================

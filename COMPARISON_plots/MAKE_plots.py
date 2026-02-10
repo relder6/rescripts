@@ -8,9 +8,29 @@ from matplotlib.widgets import Slider, Button
 from datetime import datetime
 
 # ----------------------------------------------
-# CSV files
+# Inputs
 # ----------------------------------------------
-csv_files = ["CSVs/RME_xsec_results.csv", "CSVs/DG_xsec.csv"]
+X_COL = input("Input x column name: ").strip()
+Y_COL = input("Input y column name: ").strip()
+YERR_COL = input("Input yerr column name (Enter for none): ").strip()
+
+USE_YERR = bool(YERR_COL)
+
+# ----------------------------------------------
+# CSV files and check
+# ----------------------------------------------
+csv_files = ["CSVs/pcal_pass0p1.csv"]
+# csv_files = ["CSVs/RME_xsec_results.csv"]
+# csv_files = ["CSVs/RME_xsec_results.csv", "CSVs/WorldData.csv", "CSVs/DG_xsec.csv"]
+
+with open(csv_files[0]) as f:
+    headers = csv.DictReader(f).fieldnames
+
+for c in [X_COL, Y_COL]:
+    if c not in headers:
+        raise ValueError(f"Column '{c}' not found in CSV")
+if USE_YERR and YERR_COL not in headers:
+    raise ValueError(f"Column '{YERR_COL}' not found in CSV")
 
 # ----------------------------------------------
 # Target definitions, mapping, selection
@@ -64,13 +84,14 @@ for filepath in csv_files:
         for row in reader:
             try:
                 all_data.append({
-                    "exp": row["Exp"].strip().upper(),
+                    "exp": row["exp"].strip(),
                     "A": float(row["A"]),
                     "Z": float(row["Z"]),
-                    "xbj": float(row["x"]),
-                    "xsec": float(row["xsec_exp"]),
-                    "xsec_exp_err": float(row["xsec_exp_err"]),
-                    "source": os.path.basename(filepath)})
+                    "x": float(row[X_COL]),
+                    "y": float(row[Y_COL]),
+                    "yerr": float(row[YERR_COL]) if USE_YERR else None,
+                    "source": os.path.basename(filepath)
+                })
             except (ValueError, KeyError):
                 continue
 
@@ -108,23 +129,35 @@ for exp, points_all in experiments.items():
     for src, points in by_source.items():
         color = color_cycle[len(lines) % len(color_cycle)]
         lines[(exp, src)] = True
-        x = np.array([p["xbj"] for p in points])
-        y = np.array([p["xsec"] for p in points])
-        yerr = np.array([p["xsec_exp_err"] for p in points])
-        order = np.argsort(x)
-        x, y, yerr = x[order], y[order], yerr[order]
-        ms = 4 if src=="RME_results.csv" else 3
-        ax.errorbar(x, y, yerr=yerr, fmt=source_to_marker[src], linestyle='none',
-                    markersize=ms, capsize=0, markerfacecolor=color, markeredgewidth=1.1,
-                    color=color, label=exp)
 
-ax.set_xlabel(r"$x_{bj}$", fontsize = 14)
-ax.set_ylabel(rf"$(\sigma_{{{target_symbol}}} \, / \, {A_nominal}))$", fontsize=14)
+        x = np.array([p["x"] for p in points])
+        y = np.array([p["y"] for p in points])
+        
+        order = np.argsort(x)
+        x, y = x[order], y[order]
+        
+        ms = 4 if src == "RME_results.csv" else 3
+
+        if USE_YERR:
+            yerr = np.array([p["yerr"] for p in points])[order]
+            ax.errorbar(x, y, yerr=yerr, fmt=source_to_marker[src], linestyle='none', markersize=ms,
+                        capsize=0, markerfacecolor=color, markeredgewidth=1.1, color=color, label=exp)
+        else:
+            ax.scatter(x, y, marker=source_to_marker[src], s=ms**2 * 4, facecolors=color, edgecolors=color, label=exp)
+
+ax.set_xlabel(f"{X_COL}".strip(), fontsize = 14)
+ax.set_ylabel(f"{Y_COL}".strip(), fontsize=14)
 ax.legend()
 ax.grid(alpha=0.3)
+ax.set_title(f"{target_name} {Y_COL} vs {X_COL}")
 
-xmin, xmax = min(p["xbj"] for p in filtered_data), max(p["xbj"] for p in filtered_data)
-ymin, ymax = min(p["xsec"] - p["xsec_exp_err"] for p in filtered_data), max(p["xsec"] + p["xsec_exp_err"] for p in filtered_data)
+xmin, xmax = min(p["x"] for p in filtered_data), max(p["x"] for p in filtered_data)
+if USE_YERR:
+    ymin = min(p["y"] - p["yerr"] for p in filtered_data)
+    ymax = max(p["y"] + p["yerr"] for p in filtered_data)
+else:
+    ymin = min(p["y"] for p in filtered_data)
+    ymax = max(p["y"] for p in filtered_data)
 pad_frac = 0.05
 ax.set_xlim(xmin - pad_frac*(xmax-xmin), xmax + pad_frac*(xmax-xmin))
 ax.set_ylim(ymin - pad_frac*(ymax-ymin), ymax + pad_frac*(ymax-ymin))
@@ -171,7 +204,7 @@ def save_png(event):
     ax_save.set_visible(False)
     os.makedirs("PNGs", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = os.path.join("PNGs", f"EMC_{selected_key}_{timestamp}.png")
+    save_path = os.path.join("PNGs", f"{Y_COL}_vs_{X_COL}_{selected_key}_{timestamp}.png")
     fig.savefig(save_path, dpi=300, bbox_inches='tight')
     for s in [slider_xmin, slider_xmax, slider_ymin, slider_ymax]:
         s.ax.set_visible(True)
