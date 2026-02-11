@@ -15,9 +15,11 @@ if not os.path.exists(input_filename):
 if "4pass" in input_file:
     E_beam = 8.5831  # GeV
     theta_deg = 29.045 #deg
+    p_0 = 1.531 # GeV
 elif "5pass" in input_file:
-    E_beam = 10.6716  # example, replace with correct value if different
+    E_beam = 10.6716 # GeV
     theta_deg = 16.75 #deg
+    p_0 = 3.642
 else:
     print(f"Beam pass not detected from input file name, exiting...")
     exit(1)
@@ -26,7 +28,7 @@ theta_rad = np.radians(theta_deg)
 
 with open(input_filename, "r") as infile:
     with open(output_filename, "w") as outfile:
-        outfile.write("eprime,theta,xbj,q2,w,modelxsec,epsilon\n")
+        outfile.write("eprime,theta,xbj,q2,w,modelxsec,epsilon,delta\n")
         for line in infile:
             if line.lstrip().startswith("#") or line.lstrip().startswith(";"):
                 continue
@@ -51,6 +53,8 @@ with open(input_filename, "r") as infile:
             else:
                 epsilon = np.nan
 
-            outfile.write(",".join([f"{c}" if not np.isnan(c) else "nan" for c in cols] + [f"{epsilon}"]) + "\n")
+            delta = 100 * (eprime - p_0) / p_0
+                
+            outfile.write(",".join([f"{c}" if not np.isnan(c) else "nan" for c in cols] + [f"{epsilon}"] + [f"{delta:.2f}"])+"\n")
             
 print(f"Wrote {output_filename}")

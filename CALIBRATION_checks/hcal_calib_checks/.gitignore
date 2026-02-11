@@ -2,3 +2,7 @@ COIN/
 HMS/
 *.dat
 *.png
+pass*/
+*.txt
+ERR_log/
+STABILITY_plots/
