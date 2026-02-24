@@ -13,7 +13,7 @@ from scipy.optimize import curve_fit
 # --------------------------------------------------------------------------
 # Check file locations before running,
 # --------------------------------------------------------------------------
-root_directory = f"/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
+root_directory = f"/work/hallc/c-rsidis/relder/hallc_replay_rsidis/ROOTfiles"
 
 # --------------------------------------------------------------------------
 # Handling user inputs, unloading branches into numpy arrays

@@ -23,7 +23,7 @@ selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, s
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-root_directory = "/work/hallc/c-rsidis/skimfiles/pass0"
+root_directory = "/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
 
 input_settings_filepath = f"../FILTER_type/{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
 
@@ -143,23 +143,50 @@ with PdfPages(output_pdf_filepath) as pdf:
         w = 1.0 / (yerr**2)
         p0 = np.sum(w * y) / np.sum(w)
         p0_err = np.sqrt(1.0 / np.sum(w))
-        return p0, p0_err
+        chi2 = np.sum(((y-p0)/yerr)**2)
+        ndof = len(y)-1
+        chi2_ndof = chi2/ndof if ndof > 0 else np.nan
+        return p0, p0_err, chi2, chi2_ndof
 
+    def weighted_rms(y, yerr, p0):
+        w = 1.0 / (yerr**2)
+        variance = np.sum(w * (y - p0)**2) / np.sum(w)
+        return np.sqrt(variance)
+
+    #Page 1 yield stability fit, sigma
     elec_y = elec_df["yield"].to_numpy()
     elec_yerr = elec_df["yield_err"].to_numpy()
-    elec_p0, elec_p0_err = p0_fit(elec_y, elec_yerr)
+    elec_p0, elec_p0_err, elec_chi2, elec_chi2_ndof = p0_fit(elec_y, elec_yerr)
+    elec_sigma = weighted_rms(elec_y, elec_yerr, elec_p0)
+    elec_sigma_percent = elec_sigma / elec_p0 * 100
+    elec_hi = elec_p0 + elec_sigma
+    elec_lo = elec_p0 - elec_sigma
 
     pos_y = pos_df["yield"].to_numpy()
     pos_yerr = pos_df["yield_err"].to_numpy()
-    pos_p0, pos_p0_err = p0_fit(pos_y, pos_yerr)
+    pos_p0, pos_p0_err, pos_chi2, pos_chi2_ndof = p0_fit(pos_y, pos_yerr)
+    pos_sigma = weighted_rms(pos_y, pos_yerr, pos_p0)
+    pos_sigma_percent = pos_sigma / pos_p0 * 100
+    pos_hi = pos_p0 + pos_sigma
+    pos_lo = pos_p0 - pos_sigma
 
-    tol = 0.01
+    #Page 2 yield vs current fit, sigma
+    elec_current_y = df.loc[elec_mask, "yield"].to_numpy()
+    elec_current_yerr = df.loc[elec_mask, "yield_err"].to_numpy()
+    elec_current_p0, elec_current_p0_err, elec_current_chi2, elec_current_chi2_ndof = p0_fit(elec_current_y, elec_current_yerr)
+    elec_current_sigma = weighted_rms(elec_current_y, elec_current_yerr, elec_current_p0)
+    elec_current_sigma_percent = elec_current_sigma / elec_current_p0 * 100
+    elec_current_hi = elec_current_p0 + elec_current_sigma
+    elec_current_lo = elec_current_p0 - elec_current_sigma
 
-    elec_hi = (1 + tol) * elec_p0
-    elec_lo = (1 - tol) * elec_p0
+    pos_current_y = df.loc[pos_mask, "yield"].to_numpy()
+    pos_current_yerr = df.loc[pos_mask, "yield_err"].to_numpy()
+    pos_current_p0, pos_current_p0_err, pos_current_chi2, pos_current_chi2_ndof = p0_fit(pos_current_y, pos_current_yerr)
+    pos_current_sigma = weighted_rms(pos_current_y, pos_current_yerr, pos_current_p0)
+    pos_current_sigma_percent = pos_current_sigma / pos_current_p0 * 100
+    pos_current_hi = pos_current_p0 + pos_current_sigma
+    pos_current_lo = pos_current_p0 - pos_current_sigma
 
-    pos_hi = (1 + tol) * pos_p0
-    pos_lo = (1 - tol) * pos_p0
 
     x_idx = np.arange(len(elec_df))
     x_idx_pos = np.arange(len(pos_df))
@@ -169,25 +196,27 @@ with PdfPages(output_pdf_filepath) as pdf:
 
     fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Yield vs Run Number", fontsize=12, y=0.98)
     
-    ax_top.errorbar(x_idx,elec_df["yield"].to_numpy(),yerr=elec_df["yield_err"].to_numpy(),fmt="o", markersize=3, color="navy", label = "Electrons")
+    ax_top.axhline(elec_p0, linestyle="--", color="cornflowerblue", linewidth=1.5, label="p₀ fit", zorder=1)
+    ax_top.errorbar(x_idx,elec_df["yield"].to_numpy(),yerr=elec_df["yield_err"].to_numpy(),fmt="o", markersize=3, color="navy", label = "Electrons", zorder=2)
     ax_top.set_xticks(x_idx)
     ax_top.set_xticklabels(elec_df["runnum"].astype(str), rotation=45)
     ax_top.tick_params(axis="x", labelsize=8)
     ax_top.set_ylabel("Electron Yield", fontsize=10)
     ax_top.grid(True)
-    ax_top.axhline(elec_p0, linestyle="--", color="cornflowerblue", linewidth=1.5, label="p₀ fit")
-    ax_top.axhspan(elec_lo, elec_hi, color="lightskyblue", alpha=0.3, label=f"±{tol*100:.1f}% Tolerance Band")
+    ax_top.axhspan(elec_lo, elec_hi, color="lightskyblue", alpha=0.3, label=rf"±{elec_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
+    ax_top.text(0.02, 0.95, f"$\\chi^2/ndof = {elec_chi2_ndof: .2f}$", transform = ax_top.transAxes, fontsize = 9, verticalalignment = 'top')
     ax_top.legend(fontsize = 6)
 
-    ax_bot.errorbar(x_idx_pos,pos_df["yield"].to_numpy(),yerr=pos_df["yield_err"].to_numpy(),fmt="o", markersize=3, color="red", label = "Positrons")
+    ax_bot.axhline(pos_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="p₀ Fit", zorder=1)
+    ax_bot.errorbar(x_idx_pos,pos_df["yield"].to_numpy(),yerr=pos_df["yield_err"].to_numpy(),fmt="o", markersize=3, color="red", label = "Positrons", zorder=2)
     ax_bot.set_xticks(x_idx_pos)
     ax_bot.set_xticklabels(pos_df["runnum"].astype(str), rotation=45)
     ax_bot.tick_params(axis="x", labelsize=8)
     ax_bot.set_ylabel("Positron Yield", fontsize=10)
     ax_bot.set_xlabel("Run Number", fontsize=10)
     ax_bot.grid(True)
-    ax_bot.axhline(pos_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="p₀ Fit")
-    ax_bot.axhspan(pos_lo, pos_hi, color="mistyrose", label=f"±{tol*100:.1f}% Tolerance Band")
+    ax_bot.axhspan(pos_lo, pos_hi, color="mistyrose", alpha = 0.3, label = rf"±{pos_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
+    ax_bot.text(0.02, 0.95, f"$\\chi^2/ndof = {pos_chi2_ndof: .2f}$", transform = ax_bot.transAxes, fontsize = 9, verticalalignment = 'top')
     ax_bot.legend(fontsize = 6)
     
     fig.subplots_adjust(top = 0.95, bottom = 0.13)
@@ -199,15 +228,21 @@ with PdfPages(output_pdf_filepath) as pdf:
 
     fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Yield vs Beam Current", fontsize=12, y=0.98)
 
-    ax_top.errorbar(df.loc[elec_mask, "current"].to_numpy(), df.loc[elec_mask, "yield"].to_numpy(), yerr = df.loc[elec_mask, "yield_err"].to_numpy(), fmt = "o", markersize = 3, color = "navy", label = "Positrons")
+    ax_top.axhline(elec_current_p0, linestyle="--", color="cornflowerblue", linewidth=1.5, label="p₀ fit", zorder=1)
+    ax_top.errorbar(df.loc[elec_mask, "current"].to_numpy(), df.loc[elec_mask, "yield"].to_numpy(), yerr = df.loc[elec_mask, "yield_err"].to_numpy(), fmt = "o", markersize = 3, color = "navy", label = "Positrons", zorder = 2)
     ax_top.tick_params(axis="x", labelsize=8)
+    ax_top.axhspan(elec_current_lo, elec_current_hi, color="lightskyblue", alpha=0.3, label=rf"±{elec_current_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
     ax_top.set_ylabel("Electron Yield", fontsize=10)
+    ax_top.text(0.02, 0.95, f"$\\chi^2/ndof = {elec_current_chi2_ndof: .2f}$", transform = ax_top.transAxes, fontsize = 9, verticalalignment = 'top')
     ax_top.grid(True)
 
-    ax_bot.errorbar(df.loc[pos_mask, "current"].to_numpy(), df.loc[pos_mask, "yield"].to_numpy(), yerr = df.loc[pos_mask, "yield_err"].to_numpy(), fmt = "o", markersize = 3, color = "red", label = "Data")
+    ax_bot.axhline(pos_current_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="p₀ Fit", zorder=1)
+    ax_bot.errorbar(df.loc[pos_mask, "current"].to_numpy(), df.loc[pos_mask, "yield"].to_numpy(), yerr = df.loc[pos_mask, "yield_err"].to_numpy(), fmt = "o", markersize = 3, color = "red", label = "Data", zorder=2)
     ax_bot.tick_params(axis="x", labelsize=8)
     ax_bot.set_xlabel("Beam Current (µA)", fontsize=10)
     ax_bot.set_ylabel("Positron Yield", fontsize=10)
+    ax_bot.axhspan(pos_current_lo, pos_current_hi, color="mistyrose", alpha = 0.3, label = rf"±{pos_current_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
+    ax_bot.text(0.02, 0.95, f"$\\chi^2/ndof = {pos_current_chi2_ndof: .2f}$", transform = ax_bot.transAxes, fontsize = 9, verticalalignment = 'top')
     ax_bot.grid(True)
 
     fig.subplots_adjust(top = 0.95, bottom = 0.10)

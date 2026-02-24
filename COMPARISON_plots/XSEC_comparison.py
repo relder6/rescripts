@@ -64,10 +64,10 @@ for filepath in csv_files:
         for row in reader:
             try:
                 all_data.append({
-                    "exp": row["Exp"].strip().upper(),
+                    "exp": row["exp"].strip().upper(),
                     "A": float(row["A"]),
                     "Z": float(row["Z"]),
-                    "xbj": float(row["x"]),
+                    "xbj": float(row["xbj"]),
                     "xsec": float(row["xsec_exp"]),
                     "xsec_exp_err": float(row["xsec_exp_err"]),
                     "source": os.path.basename(filepath)})

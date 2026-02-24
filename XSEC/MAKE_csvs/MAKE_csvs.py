@@ -15,8 +15,10 @@ if BASE_DIR not in sys.path:
 from INIT.config import get_common_run_inputs, get_data_cuts
 
 # -----------------------------------------------------
-# Handling user inputs to determine setting
+# Handling user inputs
 # -----------------------------------------------------
+USING_DELTA_CORR = True
+
 selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
 # -----------------------------------------------------
@@ -64,9 +66,11 @@ with open(input_settings_filepath, "r") as infile:
 branches = ["H_gtr_dp", "H_cal_etottracknorm", "H_gtr_ph",
             "H_gtr_th", "H_gtr_x", "H_gtr_y",
             "H_kin_Q2", "H_kin_x_bj", "H_kin_W",
-            "H_cer_npeSum", "H_gtr_p"]
+            "H_cer_npeSum", "H_gtr_p",
+            "H_gtr_y", "H_gtr_th", "H_gtr_ph",
+            "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp"]
 
-branches_mc = ["hsdelta", "hsyptar", "hsxptar", "q2", "xb", "w", "weight", "eprime"]
+branches_mc = ["hsdelta", "hsyptar", "hsxptar", "q2", "xb", "w", "weight", "eprime", "hsytar", "hsxptar", "hsyptar", "hsxfp", "hsxpfp", "hsyfp", "hsypfp"]
 
 variable_mc_map = {
     "H_gtr_dp": "hsdelta",
@@ -75,7 +79,14 @@ variable_mc_map = {
     "H_kin_Q2": "q2",
     "H_kin_x_bj": "xb",
     "H_kin_W": "w",
-    "H_gtr_p": "eprime"
+    "H_gtr_p": "eprime",
+    "H_gtr_y": "hsytar",
+    "H_gtr_th": "hsxptar",
+    "H_gtr_ph": "hsyptar",
+    "H_dc_x_fp": "hsxfp",
+    "H_dc_xp_fp": "hsxpfp",
+    "H_dc_y_fp": "hsyfp",
+    "H_dc_yp_fp": "hsypfp"
     }
 
 # -----------------------------------------------------
@@ -83,24 +94,38 @@ variable_mc_map = {
 # -----------------------------------------------------
 if selected_beam_pass == "4":
     custom_bins = {
-        "H_gtr_dp": dict(binnum = 100, min = -10.000, max = 10.000),
-        "H_gtr_ph": dict(binnum = 100, min = -0.050, max = 0.050),
-        "H_gtr_th": dict(binnum = 100, min = -0.100, max = 0.100),
-        "H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
-        "H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
-        "H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
-        "H_gtr_p": dict(binnum = 76, min = 1.190, max = 2.71)
+        "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
+        "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
+        "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
+        "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
+        "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
+        "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
+        "H_gtr_p": dict(binnum = 100, min = 1.3, max = 1.8),
+        "H_gtr_y": dict(binnum = 100, min = -4, max = 4),
+        "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
+        "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
+        "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
+        "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+        "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
+        "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
     }
     
 if selected_beam_pass == "5":
     custom_bins = {
-        "H_gtr_dp": dict(binnum = 100, min = -10.000, max = 10.000),
-        "H_gtr_ph": dict(binnum = 100, min = -0.050, max = 0.050),
-        "H_gtr_th": dict(binnum = 100, min = -0.100, max = 0.100),
-        "H_kin_Q2": dict(binnum = 100, min = 2.400, max = 4.200),
-        "H_kin_x_bj": dict(binnum = 100, min = 0.175, max = 0.325),
-        "H_kin_W": dict(binnum = 100, min = 3.100, max = 3.500),
-        "H_gtr_p": dict(binnum = 176, min = 2.990, max = 6.51)
+        "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
+        "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
+        "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
+        "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
+        "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
+        "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
+        "H_gtr_p": dict(binnum = 100, min = 3.2, max = 5.2),
+        "H_gtr_y": dict(binnum = 100, min = -4, max = 4),
+        "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
+        "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
+        "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
+        "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+        "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
+        "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
     }
 
 # -----------------------------------------------------
@@ -133,14 +158,57 @@ for i, runnum in enumerate(runnums):
 
      for var, bins in custom_bins.items():
          axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
-         hist = bh.Histogram(axis, storage=bh.storage.Weight())
-         hist.fill(df_cut[var], weight=np.full(len(df_cut[var]), run_weight))
 
-         counts = hist.view().value
-         errors = np.sqrt(hist.view().variance)
+         if selected_target_shortname == "dummy":
+
+             hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
+             hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
+
+             yvals = df_cut["H_gtr_y"].values
+             varvals = df_cut[var].values
+
+             y_mid = 0.0
+             upstream_mask = yvals >= y_mid
+             downstream_mask = yvals < y_mid
+
+             # R_dummy_lh2_up, R_dummy_lh2_down = 1 / 3.5274, 1 / 3.5274 # Averaging two walls
+             # R_dummy_ld2_up, R_dummy_ld2_down = 1 / 3.7825, 1 / 3.7825 # Averaging two walls
+             
+             R_dummy_lh2_up, R_dummy_lh2_down = 1 / 4.04033, 1 / 3.12459
+             R_dummy_ld2_up, R_dummy_ld2_down = 1 / 4.66192, 1 / 3.17445
+
+             weights_lh2 = np.zeros(len(yvals))
+             weights_lh2[upstream_mask] = R_dummy_lh2_up * run_weight
+             weights_lh2[downstream_mask] = R_dummy_lh2_down * run_weight
+
+             weights_ld2 = np.zeros(len(yvals))
+             weights_ld2[upstream_mask] = R_dummy_ld2_up * run_weight
+             weights_ld2[downstream_mask] = R_dummy_ld2_down * run_weight
+
+             hist_lh2.fill(df_cut[var], weight=weights_lh2)
+             hist_ld2.fill(df_cut[var], weight=weights_ld2)
+
+             counts_lh2 = hist_lh2.view().value
+             counts_ld2 = hist_ld2.view().value
+
+             errors_lh2 = np.sqrt(hist_lh2.view().variance)
+             errors_ld2 = np.sqrt(hist_ld2.view().variance)
+
+             hist_data.setdefault(var + "_lh2", []).append([runnum, charge[i], polarity[i]] + counts_lh2.tolist())
+             hist_err_data.setdefault(var + "_lh2", []).append([runnum, charge[i], polarity[i]] + errors_lh2.tolist())
+
+             hist_data.setdefault(var + "_ld2", []).append([runnum, charge[i], polarity[i]] + counts_ld2.tolist())
+             hist_err_data.setdefault(var + "_ld2", []).append([runnum, charge[i], polarity[i]] + errors_ld2.tolist())
+             
+         else:     
+             hist = bh.Histogram(axis, storage=bh.storage.Weight())
+             hist.fill(df_cut[var], weight=np.full(len(df_cut[var]), run_weight))
+
+             counts = hist.view().value
+             errors = np.sqrt(hist.view().variance)
          
-         hist_data[var].append([runnum, charge[i], polarity[i]]+counts.tolist())
-         hist_err_data[var].append([runnum, charge[i], polarity[i]]+errors.tolist())
+             hist_data[var].append([runnum, charge[i], polarity[i]]+counts.tolist())
+             hist_err_data[var].append([runnum, charge[i], polarity[i]]+errors.tolist())
 
 # -----------------------------------------------------
 # Monte carlo histogram and csv creation
@@ -187,8 +255,11 @@ for var, bins in custom_bins.items():
             h6 = -0.78222e-06
 
             deltacorr = (h1 + h2 * deltatmp + h3 * deltatmp**2 + h4 * deltatmp**3 + h5 * deltatmp**4 + h6 * deltatmp**5)
-            
-            event_weights = df_mc_cut["weight"].values * normfac * deltacorr
+
+            if USING_DELTA_CORR:
+                event_weights = df_mc_cut["weight"].values * normfac * deltacorr
+            else:
+                event_weights = df_mc_cut["weight"].values * normfac
         else:
             print("Weights branch not found.  Exiting...")
             print(df_mc_cut.columns.tolist())
@@ -206,9 +277,10 @@ for var, bins in custom_bins.items():
 
 
 for var, rows in hist_data.items():
-    bin_edges = bin_edges_dict[var]
-    bin_left_edges = bin_edges[:-1]
-    bin_labels = [f"{i:.6f}" for i in bin_left_edges]
+    base_var = var.replace("_lh2", "").replace("_ld2", "")
+    bin_edges = bin_edges_dict[base_var]
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    bin_labels = [f"{i:.6f}" for i in bin_centers]
     columns = ["runnum", "charge", "polarity"] + bin_labels
 
     # Saving here for counts

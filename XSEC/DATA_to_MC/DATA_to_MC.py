@@ -21,29 +21,25 @@ selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, s
 # -----------------------------------------------------
 base_dir = f"../MAKE_csvs/{selected_target_shortname.upper()}"
     
-variables = ["H_gtr_dp", "H_gtr_ph", "H_gtr_th", "H_kin_Q2", "H_kin_x_bj", "H_kin_W", "H_gtr_p"]
+variables = ["H_gtr_dp", "H_gtr_ph", "H_gtr_th", "H_kin_Q2", "H_kin_x_bj", "H_kin_W", "H_gtr_p", "H_gtr_y", "H_gtr_th", "H_gtr_ph", "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp"]
 
 pdf_output = f"PDFs/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
 pp = PdfPages(pdf_output)
     
 # -----------------------------------------------------
-# TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Loop over variables and produce figures for ALL targets
+# Loop over variables and produce figures for ALL targets
 # -----------------------------------------------------
 if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2"}:
     ordered_variables = ["H_gtr_dp"] + [v for v in variables if v != "H_gtr_dp"]
     if selected_target_shortname in {"ld2", "lh2"}:
         dummy_dir = f"../MAKE_csvs/DUMMY"
-        if selected_target_shortname == "ld2":
-            R_dummy = 1 / 3.7825
-        elif selected_target_shortname == "lh2":
-            R_dummy = 1 / 3.5274
     
     for var in ordered_variables:
         histo_filepath = f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_histo.csv"
         err_filepath   = f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_err.csv"
         if selected_target_shortname in {"ld2", "lh2"}:
-            dummy_histo_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_dummy_{var}_histo.csv"
-            dummy_err_filepath   = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_dummy_{var}_err.csv"
+            dummy_histo_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_dummy_{var}_{selected_target_shortname}_histo.csv"
+            dummy_err_filepath   = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_dummy_{var}_{selected_target_shortname}_err.csv"
 
         df_yield = pd.read_csv(histo_filepath)
         df_err = pd.read_csv(err_filepath)
@@ -140,8 +136,8 @@ if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2"}:
             Yield_sub = Yield_elec - Yield_pos
             Err_sub   = np.sqrt(Err_elec**2 + Err_pos**2)
         if selected_target_shortname in {"ld2", "lh2"}:
-            Yield_sub = Yield_elec - Yield_pos - R_dummy * (Yield_elec_dummy - Yield_pos_dummy)
-            Err_sub = np.sqrt(Err_elec**2 + Err_pos**2 + (R_dummy * Err_elec_dummy)**2 + (R_dummy * Err_pos_dummy)**2)
+            Yield_sub = Yield_elec - Yield_pos - Yield_elec_dummy + Yield_pos_dummy
+            Err_sub = np.sqrt(Err_elec**2 + Err_pos**2 + Err_elec_dummy**2 + Err_pos_dummy**2)
         
         # Ratio = (e− − e+) / MC
         ratio = np.divide(Yield_sub, Yield_mc, out=np.full_like(Yield_sub, np.nan), where=(Yield_mc > 0))
@@ -151,9 +147,7 @@ if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2"}:
         ratio_err[good] = ratio[good] * np.sqrt((Err_sub[good] / Yield_sub[good])**2 + (Err_mc[good] / Yield_mc[good])**2)
 
         # Bin centers
-        bin_left_edges = np.array([float(cols) for cols in bin_cols])
-        bin_width = bin_left_edges[1] - bin_left_edges[0]
-        bin_centers = bin_left_edges + 0.5 * bin_width
+        bin_centers = np.array([float(cols) for cols in bin_cols])
 
         # Saving binned yield ratios to output CSV
         output_dir = f"{selected_target_shortname.upper()}"
@@ -207,7 +201,7 @@ if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2"}:
             order = [3, 4, 5, 6, 0, 1, 2]
             ax_top.legend([handles[i] for i in order], [labels[i] for i in order], loc='best', fontsize=10)
 
-            ax_bot.set_ylim(0.90,1.10)
+            # ax_bot.set_ylim(0.90,1.10)
 
         else:
             ax_top.errorbar(bin_centers, Yield_sub, yerr=Err_sub, fmt='o', markersize=3, color='navy', label="Data")

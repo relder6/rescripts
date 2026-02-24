@@ -19,8 +19,8 @@ USE_YERR = bool(YERR_COL)
 # ----------------------------------------------
 # CSV files and check
 # ----------------------------------------------
-csv_files = ["CSVs/pcal_pass0p1.csv"]
-# csv_files = ["CSVs/RME_xsec_results.csv"]
+# csv_files = ["CSVs/hcal_pass0p1.csv", "CSVs/pcal_pass0p1.csv"]
+csv_files = ["CSVs/RME_xsec_results.csv"]
 # csv_files = ["CSVs/RME_xsec_results.csv", "CSVs/WorldData.csv", "CSVs/DG_xsec.csv"]
 
 with open(csv_files[0]) as f:
@@ -116,7 +116,10 @@ plt.subplots_adjust(bottom=0.18, left=0.18)
 marker_cycle = ['o', 's', '^', 'v', 'P', 'X', '*', '<', '>']
 source_to_marker = {src: ("D" if src=="RME_results.csv" else marker_cycle.pop(0)) for src in unique_sources}
 
-color_cycle = ["#000000","#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#a65628","#f781bf"]
+color_cycle = ["#000000","#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#a65628","#f781bf",
+               "#999999","#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f","#e5c494",
+               "#b3b3b3","#1b9e77","#d95f02","#7570b3","#66a61e","#e7298a","#a6761d","#666666"]
+
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=color_cycle)
 color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
 

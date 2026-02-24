@@ -22,7 +22,7 @@ selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, s
 # -----------------------------------------------------
 model_xsec_filepath = f"../MODEL_xsec/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_model_xsec.csv"
 
-data_to_mc_filepath = f"../DATA_to_MC/{selected_target_shortname.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_H_gtr_p.csv"
+data_to_mc_filepath = f"../DATA_to_MC/{selected_target_shortname.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_H_gtr_dp.csv"
 
 xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
 
@@ -31,14 +31,14 @@ xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_{sele
 # -----------------------------------------------------
 df_model_xsec = pd.read_csv(model_xsec_filepath)
 
-df_data_to_mc = pd.read_csv(data_to_mc_filepath).rename(columns={"bin_center": "eprime"})
+df_data_to_mc = pd.read_csv(data_to_mc_filepath).rename(columns={"bin_center": "delta"})
 
 # -----------------------------------------------------
 # Forming the xsec
 # -----------------------------------------------------
 df_model_xsec["modelxsec"] = pd.to_numeric(df_model_xsec["modelxsec"], errors="coerce")
 
-df_merged = pd.merge(df_data_to_mc, df_model_xsec, on="eprime", how="inner")
+df_merged = pd.merge(df_data_to_mc, df_model_xsec, on="delta", how="inner")
 
 df_merged["xsec_exp"] = df_merged["ratio"] * df_merged["modelxsec"]
 
