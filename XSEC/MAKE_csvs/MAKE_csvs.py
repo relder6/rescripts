@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import boost_histogram as bh
 import os, re, sys
+import csv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
@@ -51,14 +52,20 @@ weight = []
 charge = []
 polarity = []
 
-with open(input_settings_filepath, "r") as infile:
-    next(infile) # Skipping the header line here
-    for line in infile:
-        parts = line.strip().split("\t")
-        runnums.append(parts[0])
-        charge.append(parts[12])
-        weight.append(parts[19])
-        polarity.append(parts[6].strip()[0])
+with open(input_settings_filepath, "r", newline="") as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        try:
+            #runnums.append(int(row["runnum"]))
+            runnums.append(row["runnum"])
+            charge.append(row["qbeam"])
+            weight.append(row["weight"])
+            hms_p_val = row["hms_p"]
+            polarity.append(str(hms_p_val).strip()[0])
+        except KeyError:
+            continue
+        except ValueError:
+            continue
 
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames

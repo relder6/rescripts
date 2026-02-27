@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
 
-import os, re, sys
+import os, re, sys, csv
 import numpy as np
-import csv
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_common_run_inputs
 
-# =====================================================================
-# Defining paths here
-# =====================================================================
-
+# -----------------------------------------------------
+# Establishing paths
+# -----------------------------------------------------
 input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
 report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
-run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
+bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
                 25396, 25397,
                 23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
                 24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498, 
                 24911,24967,25047,25081,25406,25407,25416,25417]
-
 # Runs 23853 - 23860 are commissioning runs; skipping these for now
 # Runs 25396 and 25397 have NEGATIVE YIELDS in my scripts for some reason???!!!
 # Low current runs, 4pass:
@@ -29,189 +27,123 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
 # Low current runs, 5pass:
 # 24911,24967,25047,25081,25406,25407,25416,25417
 
-
-# =====================================================================
-# Handling user inputs
-# =====================================================================
+# -----------------------------------------------------
+# Input handling
+# -----------------------------------------------------
 selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
-output_filepath = f"{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat" # The name and location of the output file
-
-# =====================================================================
-# Reading auxfiles runlist, filtering and extracting lines
-# =====================================================================
-
-with open(input_filepath, "r") as infile:
-    lines = infile.readlines()
-
-run_lines = []
-
-for line in lines:
-    if line.lstrip().startswith("#"):        # dropping comment lines
-        continue
-    if line.lstrip().startswith("!"):        # dropping lines starting with !
-        continue
-    if re.match(r"^\s*[-=*]", line):         # dropping separator lines
-        continue
-    run_lines.append(line)
-
-filtered_lines = []
-
-for line in run_lines:
-    parts = re.split(r'\s+', line.strip())
-    ebeam, target_type, run_type = "", "", ""
-    for part in parts:
-        if re.match(r'^\d+\.\d+$', part):
-            ebeam = part
-            break
-    for part in parts:
-        if part.lower() in ["hole", "optics", "heep", "hee", "hmsdis", "shmsdis", "pi-sidis", "pi+sidis", "junk"]:
-            run_type = part.lower()
-            break
-    for part in parts:
-        if part.lower() in ["lh2", "c", "cu", "al", "ld2", "dummy", "hole"]:
-            target_type = part.lower()
-            break
-    runnum = int(parts[0])
-    beam_match = ebeam.startswith(beam_prefix)
-
-    if (selected_run_type == run_type.strip().lower() and
-        selected_target_shortname.lower() == target_type.strip().lower() and
-        beam_match and runnum not in skip_runnums):
-        filtered_lines.append(line)
-        
-output_runnums_filepath = f"CSVs/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runnums.csv"
-
-# =====================================================================
-# Writing runnums to csv
-# =====================================================================
-
-with open(output_runnums_filepath, "w") as outfile:
-    runnums = [re.split(r'\s+',line.strip())[0] for line in filtered_lines]
-    outfile.write(",".join(runnums))
-
-with open(output_runnums_filepath, "r") as infile:
-    runnums = infile.read().strip().split(",")
-
-# =====================================================================
-# Reading in fan speed correction and boiling correction
-# =====================================================================
-
-runinfo_lookup = {}
-if os.path.exists(run_info_filepath):
-    with open(run_info_filepath, "r") as csvfile:
+output_filepath = f"{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
+# output_filepath = "testing.csv"
+# -----------------------------------------------------
+# Bigtable look-up
+# -----------------------------------------------------
+bigtable_lookup = {}
+if os.path.exists(bigtable_filepath):
+    with open(bigtable_filepath, "r") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             try:
+                # Purely reading from the bigtable here,
                 runnum = int(row["run"])
+                run_type = row.get("run_type", "N/A")
+                target = row.get("target", "N/A")
+                ebeam = row.get("ebeam", "N/A")
+                ibeam = row.get("BCM2_I", "N/A")
+                qbeam = row.get("BCM2_Q", "N/A")
+                hms_p = row.get("hms_p", "N/A")
+                hms_th = row.get("hms_th", "N/A")
+                ps3 = row.get("ps3", "N/A")
+                ps4 = row.get("ps4", "N/A")
+                trackeff = row.get("h_esing_Eff", "N/A")
+                livetime = row.get("comp_livetime", "N/A")
+                fan_mean = row.get("fan_mean", "N/A")
+                start_time = row.get("start_time", "N/A")
+                stop_time = row.get("stop_time", "N/A")
+
+                # Being sure to only read out the boil_corr for liquid targets,
                 if selected_target_shortname in ["lh2", "ld2"]:
                     boil_corr = row.get("boil_corr", "N/A")
                 else:
                     boil_corr = 1.0
-                fan_mean = row.get("fan_mean", "N/A")
 
-                runinfo_lookup[runnum] = {
-                    "boil_corr": boil_corr,
-                    "fan_mean": fan_mean
-                    }
-                
+                # Calculating extra values (like weights) that downstream scripts expect,
+                if (selected_run_type == run_type.strip().lower() and
+                    selected_target_shortname.lower() == target.strip().lower() and
+                    ebeam.startswith(beam_prefix) and
+                    runnum not in skip_runnums):
+
+                    ps3_val, ps4_val = float(ps3), float(ps4)
+
+                    if ps3_val == -999 or ps4_val == -999:
+                        print(f"WARNING: run {runnum} has issues with prescale values.  Fix the lookup table for this setting!")
+                        continue
+                    elif ps3_val != -1 and ps4_val != -1:
+                        print(f"WARNING: run {runnum} has both prescales set (ps3={ps3_val}, ps4={ps4_val}), using ps3.")
+                    elif ps3_val != -1 and ps4_val == -1:
+                        ps = ps3_val
+                    elif ps4_val != -1 and ps3_val == -1:
+                        ps = ps4_val
+                    else:
+                        print(f"Run {runnum} has no valid prescale (both -1), skipping...")
+                        continue
+                    
+                   
+                    nu = abs(float(ebeam)) - abs(float(hms_p))
+                    hms_th_rad = np.deg2rad(float(hms_th))
+                    q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
+                    epsilon = 1 / (1 + 2 * (1 + (nu**2 / q2)) * np.tan(hms_th_rad/ 2))**2
+                    weight = float(boil_corr) * float(ps) / (float(livetime) * float(trackeff))
+
+                    bigtable_lookup[runnum] = {"run_type": run_type,
+                                               "start_time": start_time,
+                                               "stop_time": stop_time,
+                                               "boil_corr": boil_corr,
+                                               "fan_mean": fan_mean,
+                                               "ebeam": ebeam,
+                                               "ibeam": ibeam,
+                                               "qbeam": qbeam,
+                                               "target": target,
+                                               "hms_p": hms_p,
+                                               "hms_th": hms_th,
+                                               "hms_th_rad": hms_th_rad,
+                                               "ps3": ps3,
+                                               "ps4": ps4,
+                                               "trackeff": trackeff,
+                                               "nu": nu,
+                                               "q2": q2,
+                                               "epsilon": epsilon,
+                                               "weight": weight}
             except (ValueError, KeyError):
                 continue
-
+                    
             
-# =====================================================================
-# Reading in report files and compiling the tsv
-# =====================================================================
-        
-with open(output_filepath, "w") as outfile:
-    # Write header
-    outfile.write("#Run#\tDate\ttStart\tEbeam\tIbeam\tTarget\tHMSp\tHMSth\tSHMSp\tSHMSth\tPrescaleSettings\tRunType\tBCM2CutCh\tPs3\tPs4\ttLive\tPTrigs\tELREAL\tEff\tWeight\tnu\tQ2\tepsilon\txbj\tfan_mean\tboilcorr\t# Comments\n")
-    
-    for line in filtered_lines:
-        parts = re.split(r'\s+', line.strip())
-        # First 12 columns: standard columns
-        runnum = parts[0]
-        date = parts[1]
-        tstart = parts[2]
-        ebeam = parts[3]
-        ibeam = parts[4]
-        target = parts[5]
-        hms_p = parts[6]
-        hms_th = parts[7]
-        shms_p = parts[8]
-        shms_th = parts[9]
-        prescales = parts[10]
-        runtype = parts[11]
-        comment = " ".join(parts[12:]) if len(parts) > 12 else "" #This joins everything after the 12th column together as a comment.
-        if comment and not comment.startswith("# "):
-            comment = "# " + comment
+# -----------------------------------------------------
+# Bigtable look-up
+# -----------------------------------------------------
+output_dir = os.path.dirname(output_filepath)
+if output_dir:
+    os.makedirs(output_dir, exist_ok=True)
+
+if bigtable_lookup:
+    columns = ["runnum"] + list(next(iter(bigtable_lookup.values())).keys())
+
+    with open(output_filepath, "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=columns)
+        writer.writeheader()
+
+        rows_written = 0
+
+        for runnum, data in bigtable_lookup.items():
+
+            if (selected_run_type == data["run_type"].strip().lower() and
+                selected_target_shortname.lower() == data["target"].strip().lower() and
+                data["ebeam"].startswith(beam_prefix) and
+                runnum not in skip_runnums):
             
-        # -- Extracting values from the report files
+                writer.writerow({"runnum": runnum, **data})
+                rows_written += 1
 
-        report_file = report_filepath.format(runnum=runnum)
-        bcm2cutch, ps3, ps4, trackeff, phystriggers, helreal = "-999", "-999", "-999", "-999", "-999", "-999"
+    print(f"\n☢️  Saved {rows_written} matching lines to {output_filepath}")
 
-        if os.path.exists(report_file):
-            with open(report_file, "r") as rep:
-                for rep_line in rep:
-                    if rep_line.startswith("BCM2  Beam Cut Charge: "):
-                        m = re.search(r"([\d.]+)\s+uC", rep_line)
-                        if m:
-                            bcm2cutch = m.group(1)
-                    elif rep_line.startswith("Ps3_factor = "):
-                        m = re.search(r"Ps3_factor\s*=\s*([+-]?\d+)", rep_line)
-                        if m:
-                            ps3 = float(m.group(1))
-                    elif rep_line.startswith("Ps4_factor = "):
-                        m = re.search(r"Ps4_factor\s*=\s*([+-]?\d+)", rep_line)
-                        if m:
-                            ps4 = float(m.group(1))
-                    elif rep_line.startswith("E SING FID TRACK EFFIC         :     "):
-                        m = re.search(r"([\d.]+)\s", rep_line)
-                        if m:
-                            trackeff = float(m.group(1))
-                    elif rep_line.startswith("Accepted Physics Triggers      : "):
-                        m = re.search(r"([\d.]+)\s", rep_line)
-                        if m:
-                            phystriggers = float(m.group(1))
-                    elif rep_line.startswith("hEL_REAL  :	"):
-                        m = re.search(r"([\d.]+)\s", rep_line)
-                        if m:
-                            helreal = float(m.group(1))
-
-        ps3_val, ps4_val = float(ps3), float(ps4)
-        if ps3_val == -999 or ps4_val == -999:
-            print(f"WARNING: run {runnum} has issues with prescale values.  Fix the lookup table for this setting!")
-            continue
-        elif ps3_val != -1 and ps4_val != -1:
-            print(f"WARNING: run {runnum} has both prescales set (ps3={ps3_val}, ps4={ps4_val}), using ps3.")
-        elif ps3_val != -1 and ps4_val == -1:
-            ps = ps3_val
-        elif ps4_val != -1 and ps3_val == -1:
-            ps = ps4_val
-        else:
-            print(f"Run {runnum} has no valid prescale (both -1), skipping...")
-            continue
-        livetime_unformatted = float(ps) * float(phystriggers) / float(helreal)
-        if livetime_unformatted > 1:
-            livetime_unformatted = 1
-        livetime = float(livetime_unformatted)
-        nu = abs(float(ebeam)) - abs(float(hms_p))
-        hms_th_float = float(hms_th)
-        hms_th_rad = np.deg2rad(hms_th_float)
-        Q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
-        epsilon = 1 / (1 + 2 * (1 + (nu**2 / Q2)) * np.tan(hms_th_rad/ 2))**2
-        runnum_int = int(runnum)
-        runinfo_val = runinfo_lookup.get(runnum_int, {"fan_current_correction": "N/A", "fan_mean":"N/A"})
-        boil_corr = runinfo_val["boil_corr"]
-        weight = float(boil_corr) * float(ps) / ((float(livetime) * float(trackeff)))
-        fan_mean = runinfo_val["fan_mean"]
-        xbj = Q2 / (2 * 0.938 * (abs(float(nu))))
-        # Composing the tsv line
-        # tsv_line = "\t".join([runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, ps3, ps4, livetime, phystriggers, helreal, trackeff, nu, Q2,  comment ])
-        tsv_line = "\t".join(map(str, [runnum, date, tstart, ebeam, ibeam, target, hms_p, hms_th, shms_p, shms_th, prescales, runtype, bcm2cutch, f"{ps3:+}", f"{ps4:+}", f"{livetime:.3f}", f"{phystriggers:.8g}", f"{helreal:.8g}", f"{trackeff:.4f}", f"{weight:+.6f}", f"{nu:.3f}", f"{Q2:.3f}", f"{epsilon:.3f}", f"{xbj:.3f}", fan_mean, boil_corr, comment]))
-
-        outfile.write(tsv_line + "\n")
-
-print(f"\n☢️  Wrote {len(filtered_lines)} matching lines to {output_filepath}")
-print(f"\n☢️  Wrote matching run numbers to {output_runnums_filepath}")
+else:
+    print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{selected_target_shortname}'. No file was written.")
