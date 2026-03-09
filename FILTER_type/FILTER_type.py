@@ -11,21 +11,15 @@ from INIT.config import get_common_run_inputs
 # -----------------------------------------------------
 # Establishing paths
 # -----------------------------------------------------
-input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
-report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
-bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
+bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
-                25396, 25397,
-                23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
-                24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498, 
-                24911,24967,25047,25081,25406,25407,25416,25417]
-# Runs 23853 - 23860 are commissioning runs; skipping these for now
-# Runs 25396 and 25397 have NEGATIVE YIELDS in my scripts for some reason???!!!
-# Low current runs, 4pass:
-# 23918,23919,23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,24498
-# Low current runs, 5pass:
-# 24911,24967,25047,25081,25406,25407,25416,25417
+                #Now skipping the low current (< 10 uA) runs,
+                23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
+                24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
+                24498,24563,24911,24967,25047,25081,25406,25407,25416,25417,
+                #Now skipping some runs that have negative yields (?!),
+                25396, 25397]
 
 # -----------------------------------------------------
 # Input handling
@@ -33,7 +27,7 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
 selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
 output_filepath = f"{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
-# output_filepath = "testing.csv"
+
 # -----------------------------------------------------
 # Bigtable look-up
 # -----------------------------------------------------
@@ -49,6 +43,9 @@ if os.path.exists(bigtable_filepath):
                 target = row.get("target", "N/A")
                 ebeam = row.get("ebeam", "N/A")
                 ibeam = row.get("BCM2_I", "N/A")
+                ibeam1 = row.get("BCM1_I", "N/A")
+                ibeam4a = row.get("BCM4A_I", "N/A")
+                ibeam4c = row.get("BCM4C_I", "N/A")
                 qbeam = row.get("BCM2_Q", "N/A")
                 hms_p = row.get("hms_p", "N/A")
                 hms_th = row.get("hms_th", "N/A")
@@ -92,7 +89,15 @@ if os.path.exists(bigtable_filepath):
                     hms_th_rad = np.deg2rad(float(hms_th))
                     q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
                     epsilon = 1 / (1 + 2 * (1 + (nu**2 / q2)) * np.tan(hms_th_rad/ 2))**2
-                    weight = float(boil_corr) * float(ps) / (float(livetime) * float(trackeff))
+                    
+                    # weight = float(ps) / (float(livetime) * float(trackeff))
+
+                    current_offset_corr = 1
+
+                    # if selected_target_shortname == "cu":
+                    #     current_offset_corr = 1 / (1 + (0.279928 / float(ibeam) ))
+
+                    weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
 
                     bigtable_lookup[runnum] = {"run_type": run_type,
                                                "start_time": start_time,
@@ -101,6 +106,9 @@ if os.path.exists(bigtable_filepath):
                                                "fan_mean": fan_mean,
                                                "ebeam": ebeam,
                                                "ibeam": ibeam,
+                                               "ibeam1": ibeam1,
+                                               "ibeam4a": ibeam4a,
+                                               "ibeam4c": ibeam4c,
                                                "qbeam": qbeam,
                                                "target": target,
                                                "hms_p": hms_p,
@@ -118,7 +126,7 @@ if os.path.exists(bigtable_filepath):
                     
             
 # -----------------------------------------------------
-# Bigtable look-up
+# Writing output table
 # -----------------------------------------------------
 output_dir = os.path.dirname(output_filepath)
 if output_dir:

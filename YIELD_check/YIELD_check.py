@@ -41,16 +41,16 @@ beamcurrents = []
 weights = []
 
 with open(input_settings_filepath, "r", newline = "") as infile:
-    reader = csv.DictReader(infile, delimiter = "\t")
+    reader = csv.DictReader(infile)
     
     for row in reader:
-        runnums.append(row["#Run#"])
-        prescale3_factors.append(row["Ps3"])
-        prescale4_factors.append(row["Ps4"])
-        beam_charges.append(row["BCM2CutCh"])
-        hmsmomentum.append(row["HMSp"])
-        beamcurrents.append(row["Ibeam"])
-        weights.append(row["Weight"])
+        runnums.append(row["runnum"])
+        prescale3_factors.append(row["ps3"])
+        prescale4_factors.append(row["ps4"])
+        beam_charges.append(row["qbeam"])
+        hmsmomentum.append(row["hms_p"])
+        beamcurrents.append(row["ibeam"])
+        weights.append(row["weight"])
 
 if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2", "dummy"}:
 

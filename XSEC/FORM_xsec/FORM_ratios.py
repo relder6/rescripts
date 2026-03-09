@@ -113,7 +113,7 @@ df_denom = df_denom.rename(columns=denom_rename)
 
 df_merged = pd.merge(df_num, df_denom, on=merge_cols, how="inner")
 
-df_merged["xsec_ratio"] = df_merged["xsec_exp_num"] / df_merged["xsec_exp_denom"] 
+df_merged["xsec_ratio"] = df_merged["xsec_exp_num"] / df_merged["xsec_exp_denom"]
 
 df_merged["xsec_ratio_err"] = df_merged["xsec_ratio"] * np.sqrt((df_merged["xsec_exp_err_num"] / df_merged["xsec_exp_num"])**2 + (df_merged["xsec_exp_err_denom"] / df_merged["xsec_exp_denom"])**2)
 
@@ -132,8 +132,9 @@ df_merged["f2rat"] = f2rat
 df_merged["iso_corr"] = (0.5*(Z_num + N_num) * (1.0 + df_merged["f2rat"]) / (Z_num + N_num * df_merged["f2rat"]))
 
 df_merged["xsec_ratio_final"] = df_merged["xsec_ratio_norm"] * df_merged["iso_corr"]
-
+# df_merged["xsec_ratio_final"] = df_merged["xsec_ratio_norm"]
 df_merged["xsec_ratio_final_err"] = df_merged["xsec_ratio_norm_err"] * df_merged["iso_corr"]
+# df_merged["xsec_ratio_final_err"] = df_merged["xsec_ratio_norm_err"]
 
 # -----------------------------------------------------
 # Save output csv
@@ -160,14 +161,14 @@ vars_to_plot = {
     "epsilon": df_merged["epsilon"].to_numpy(),
     }
 
-xsec_ratio_norm = df_merged["xsec_ratio_norm"].to_numpy()
-xsec_ratio_norm_err = df_merged["xsec_ratio_norm_err"].to_numpy()
+xsec_ratio_final = df_merged["xsec_ratio_final"].to_numpy()
+xsec_ratio_final_err = df_merged["xsec_ratio_final_err"].to_numpy()
 
 pp = PdfPages(output_pdf_filepath)
 
 for var, val in vars_to_plot.items():
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
-    ax.errorbar(val, xsec_ratio_norm, yerr=xsec_ratio_norm_err, fmt='o', markersize=6, capsize=0, color='navy')
+    ax.errorbar(val, xsec_ratio_final, yerr=xsec_ratio_final_err, fmt='o', markersize=6, capsize=0, color='navy')
     ax.xaxis.set_major_locator(ticker.AutoLocator())
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.set_xlabel(f"{var}")

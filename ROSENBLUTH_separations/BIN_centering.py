@@ -81,52 +81,92 @@ for filepath in csv_files:
 
 df_data = pd.concat(all_rows, ignore_index=True)
 
-output_csv = f"CSVs/{selected_run_type.upper()}_{selected_target_shortname}_xsec_results_compiled.csv"
+output_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_{selected_target_shortname}.csv"
 
-# -----------------------------------------------------
-# Starting logic to filter, figure out new binning
-# -----------------------------------------------------
 selected_var = "xbj"
 
 df_xbj_minmax = (df_data.groupby("exp")[selected_var].agg(["min", "max"]).reset_index())
-df_xbj_minmax = df_xbj_minmax.rename(columns={"min": f"{selected_var}_min","max": f"{selected_var}_max"})
-
+df_xbj_minmax = df_xbj_minmax.rename(columns={"min": f"{selected_var}_min", "max": f"{selected_var}_max"})
 overlap_min = df_xbj_minmax[f"{selected_var}_min"].max()
 overlap_max = df_xbj_minmax[f"{selected_var}_max"].min()
-
 overlap_range = float(overlap_max) - float(overlap_min)
 
-stepsize = float(overlap_range) / float(nbins)
+if nbins == 1:
+    df_fit = df_data
 
-central_value = overlap_min + overlap_range / 2
+    exps = df_fit["exp"].unique()
+    if len(exps) < 2:
+        raise ValueError(f"Need at least 2 experiments for common-center fit, got {len(exps)}")
 
-if nbins % 2 == 1:
-    #Odd: center is exact middle
-    central_value = (overlap_min + overlap_max) / 2
-    half_n = nbins // 2
-    bin_centers = central_value + stepsize * np.arange(-half_n, half_n + 1)
-else:
-    #Even: two central bins around the middle
-    central_value = (overlap_min + overlap_max) / 2
-    half_n = nbins // 2
-    bin_centers = central_value + stepsize * (np.arange(-half_n, half_n) + 0.5)
+    slopes = []
+    intercepts = []
+    for exp in exps:
+        sub = df_fit[df_fit["exp"] == exp]
+        x = sub[selected_var].to_numpy()
+        y = sub["q2"].to_numpy()
+        if len(x) < 2:
+            raise ValueError(f"Not enough points to fit line for {exp}")
+        m, b = np.polyfit(x, y, 1)
+        slopes.append(m)
+        intercepts.append(b)
 
-bin_centers = np.array(sorted(bin_centers))
+    slopes = np.array(slopes)
+    intercepts = np.array(intercepts)
 
-edges = np.zeros(len(bin_centers)+1)
+    x_min = df_fit[selected_var].min()
+    x_max = df_fit[selected_var].max()
 
-edges[1:-1] = (bin_centers[:-1] + bin_centers[1:]) / 2.0 #These are the center bins, they should be evenly spaced
+    if len(exps) == 2:
+        slope1, slope2 = slopes
+        int1, int2 = intercepts
+        if np.isclose(slope1, slope2):
+            x_center = 0.5 * (x_min + x_max)
+        else:
+            x_center = (int2 - int1) / (slope1 - slope2)
+    else:
+        x_grid = np.linspace(x_min, x_max, 1000)
+        y_all = slopes[:, None] * x_grid[None, :] + intercepts[:, None]
+        var_y = np.var(y_all, axis=0)
+        idx_min = np.argmin(var_y)
+        x_center = x_grid[idx_min]
 
-edges[0]  = overlap_min  - (bin_centers[1]  - bin_centers[0]) / 2.0
-edges[-1] = overlap_max + (bin_centers[-1] - bin_centers[-2]) / 2.0
+    x_center = max(min(x_center, x_max), x_min)
 
-centers_arr = bin_centers.reshape(1, -1)
-vals = df_data[selected_var].to_numpy().reshape(-1, 1)
-df_data["bin_num"] = np.argmin(np.abs(vals - centers_arr), axis=1) #I'm catching the 'lost' data points here: things outside the overlap range get assigned to closest bin.
+    bin_centers = np.array([x_center])
+
+    stepsize = x_max - x_min
+    edges = np.array([x_min, x_max])
+
+    df_data["bin_num"] = 0
+
+if nbins != 1:
+    stepsize = float(overlap_range) / float(nbins)
+    central_value = overlap_min + overlap_range / 2
+
+    if nbins % 2 == 1:
+        central_value = (overlap_min + overlap_max) / 2
+        half_n = nbins // 2
+        bin_centers = central_value + stepsize * np.arange(-half_n, half_n + 1)
+    else:
+        central_value = (overlap_min + overlap_max) / 2
+        half_n = nbins // 2
+        bin_centers = central_value + stepsize * (np.arange(-half_n, half_n) + 0.5)
+
+    bin_centers = np.array(sorted(bin_centers))
+
+    edges = np.zeros(len(bin_centers) + 1)
+    edges[1:-1] = (bin_centers[:-1] + bin_centers[1:]) / 2.0
+    edges[0]  = overlap_min  - (bin_centers[1]  - bin_centers[0]) / 2.0
+    edges[-1] = overlap_max + (bin_centers[-1] - bin_centers[-2]) / 2.0
+
+    centers_arr = bin_centers.reshape(1, -1)
+    vals = df_data[selected_var].to_numpy().reshape(-1, 1)
+    df_data["bin_num"] = np.argmin(np.abs(vals - centers_arr), axis=1)
 
 print(f"Overlap range: {overlap_min:.4f} → {overlap_max:.4f}")
 print(f"Stepsize: {stepsize:.4f}")
 print(f"Bin centers ({nbins} bins):\n{bin_centers}")
+
 
 # -----------------------------------------------------
 # Now building input strings, collecting model xsec of bin centers
@@ -212,10 +252,27 @@ for _, row in df_centers_bin.iterrows():
 
 df_data["bc_corr"] = df_data["bc_xsec_model"] / df_data["xsec_exp"]
 
-col_final = ["exp", "A", "Z", "ebeam", "theta", "eprime", "xbj",
+m_p = 0.93827208943 # proton mass, GeV
+
+alpha = 1 / 137.035999177 # fine structure constant
+
+df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
+
+df_data["theta_rad"] = np.deg2rad(df_data["theta"])
+
+df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
+
+df_data["bc_gamma"] = alpha / (2 * np.pi**2 * df_data["bc_q2"]) * (df_data["ebeam"] - df_data["bc_nu"]) / (df_data["ebeam"]) * (df_data["bc_nu"] * (1 - df_data["bc_xbj"])) / (1 - df_data["bc_epsilon"])
+
+df_data["bc_sigma_R"] = df_data["xsec_exp"] * df_data["bc_corr"] / df_data["bc_gamma"]
+
+df_data["bc_sigma_R_err"] = df_data["xsec_exp_err"] * df_data["bc_corr"] / df_data["bc_gamma"]
+
+col_final = ["exp", "A", "Z", "ebeam", "theta", "theta_rad", "eprime", "xbj",
              "q2", "w2", "epsilon", "xsec_exp", "xsec_exp_err",
              "xsec_model", "bc_xsec_model", "bc_corr", "bin_num",
-             "bc_xbj", "bc_q2"]
+             "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_gamma",
+             "bc_sigma_R", "bc_sigma_R_err"]
 
 df_final = df_data[col_final]
 
@@ -225,13 +282,16 @@ print(f"Saved compiled CSV → {output_csv}")
 print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].max():.6f}")
 
 # -----------------------------------------------------
-# Starting logic to filter, figure out new binning
+# Plotting
 # -----------------------------------------------------
 plt.figure()
 
 unique_bins = sorted(df_data["bin_num"].unique())
 
-plt.axvspan(overlap_min, overlap_max, color="lightskyblue", alpha=0.1, label="Overlap Region")
+if nbins != 1:
+    plt.axvspan(overlap_min, overlap_max, color="lightskyblue", alpha=0.1, label="Overlap Region")
+else:
+    plt.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
 
 plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*",label="Bin centers", s=64)
 
@@ -245,16 +305,6 @@ for i in range(1, len(edges)-1):
     else:
         plt.axvline(edges[i], ls="--", color="red", alpha=0.8)
 
-# for i, value in enumerate([overlap_min, overlap_max]):
-#     if i == 0:
-#         plt.axvline(value, ls=":", color="red", alpha=0.4, label="Overlap Bounds")
-#     else:
-#         plt.axvline(value, ls=":", color="red", alpha=0.4)
-            
-    
-# plt.axvline(overlap_min, ls=":", color="red", alpha=0.2, label="Overlap min/max")
-# plt.axvline(overlap_max, ls=":", color="red", alpha=0.2)
-
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
 plt.title(f"{selected_target_titlename} Binning Test (nbins={nbins})")
@@ -262,9 +312,9 @@ plt.title(f"{selected_target_titlename} Binning Test (nbins={nbins})")
 plt.legend()
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
-plt.savefig("PNGs/{selected_run_type)_{selected_target_shortname}_binning_test.png")
+plt.savefig("PNGs/{selected_run_type}_{selected_target_shortname}_binning_test.png")
 
-plt.show()
+# plt.show()
 
 plt.close()
     

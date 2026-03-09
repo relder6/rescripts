@@ -18,7 +18,7 @@ from INIT.config import get_common_run_inputs, get_data_cuts
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-USING_DELTA_CORR = True
+USING_DELTA_CORR = False
 
 selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
@@ -60,8 +60,9 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
             runnums.append(row["runnum"])
             charge.append(row["qbeam"])
             weight.append(row["weight"])
-            hms_p_val = row["hms_p"]
-            polarity.append(str(hms_p_val).strip()[0])
+            hms_p_val = float(row["hms_p"])
+            polarity.append("-" if hms_p_val < 0 else "+")
+            print("RAW hms_p:", repr(row.get("hms_p")))
         except KeyError:
             continue
         except ValueError:
@@ -175,14 +176,16 @@ for i, runnum in enumerate(runnums):
              varvals = df_cut[var].values
 
              y_mid = 0.0
-             upstream_mask = yvals >= y_mid
-             downstream_mask = yvals < y_mid
+             upstream_mask = yvals < y_mid
+             downstream_mask = yvals >= y_mid
 
-             # R_dummy_lh2_up, R_dummy_lh2_down = 1 / 3.5274, 1 / 3.5274 # Averaging two walls
-             # R_dummy_ld2_up, R_dummy_ld2_down = 1 / 3.7825, 1 / 3.7825 # Averaging two walls
-             
-             R_dummy_lh2_up, R_dummy_lh2_down = 1 / 4.04033, 1 / 3.12459
-             R_dummy_ld2_up, R_dummy_ld2_down = 1 / 4.66192, 1 / 3.17445
+             # Here is dummy:cell wall scaling if averaging across entire slab/cell wall
+             # R_dummy_lh2_up = R_dummy_lh2_down = 1 / 7.2323
+             # R_dummy_ld2_up = R_dummy_ld2_down = 1 / 7.7552
+
+             # Here is dummy:cell wall scaling if considering separately upstream from downstream
+             R_dummy_lh2_up, R_dummy_lh2_down = 1 / 8.2325, 1 / 6.4468
+             R_dummy_ld2_up, R_dummy_ld2_down = 1 / 9.4990, 1 / 6.5493
 
              weights_lh2 = np.zeros(len(yvals))
              weights_lh2[upstream_mask] = R_dummy_lh2_up * run_weight
@@ -315,4 +318,4 @@ for var, rows in hist_data.items():
     output_err_filepath = f"{output_dir}/{output_err_filename}"
     hist_err_df.to_csv(output_err_filepath, index=False)
     
-    print(f"Saved {output_filename} and {output_err_filename} to {output_filepath}.")
+print(f"Saved {output_filename} and {output_err_filename} to {output_filepath}.")

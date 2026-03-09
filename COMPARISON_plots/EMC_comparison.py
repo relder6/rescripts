@@ -10,7 +10,7 @@ from datetime import datetime
 # ----------------------------------------------
 # CSV files
 # ----------------------------------------------
-csv_files = ["CSVs/RME_emc_results.csv", "CSVs/WorldData.csv", "CSVs/DG_emc.csv"]
+csv_files = ["CSVs/RME_emc_results.csv", "CSVs/WorldData.csv",]# "CSVs/DG_emc.csv"]
 
 # ----------------------------------------------
 # Target definitions, mapping, selection
