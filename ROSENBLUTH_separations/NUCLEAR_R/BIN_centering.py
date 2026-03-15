@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import boost_histogram as bh
 import os, re, sys
 import subprocess
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
@@ -25,11 +25,14 @@ theta_4pass = vals["angle_4pass"]
 ebeam_5pass = vals["ebeam_5pass"]
 theta_5pass = vals["angle_5pass"]
 
-nbins = int(input("Indicate number of bins: "))
+if len(sys.argv) > 4:
+    nbins = int(sys.argv[4])
+else:
+    nbins = int(input("Indicate number of bins: "))
 
 model_xsec_dir = "../../mc-single-arm/util/dis_xec"
 
-ratio_directory = "../XSEC/FORM_xsec"
+xsec_dir = "../XSEC/FORM_xsec"
 
 beam_passes = ["4pass", "5pass"]
 
@@ -39,7 +42,7 @@ beam_passes = ["4pass", "5pass"]
 csv_files = []
 
 for beam_pass in beam_passes:
-    csv_files.append(f"{ratio_directory}/{selected_target_shortname.upper()}/XSEC_{selected_run_type}_{beam_pass}_{selected_target_shortname}.csv")
+    csv_files.append(f"{xsec_dir}/{selected_target_shortname.upper()}/XSEC_{selected_run_type}_{beam_pass}_{selected_target_shortname}.csv")
 
 all_rows = []
 

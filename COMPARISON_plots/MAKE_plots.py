@@ -20,7 +20,7 @@ USE_YERR = bool(YERR_COL)
 # CSV files and check
 # ----------------------------------------------
 # csv_files = ["CSVs/hcal_pass0p1.csv", "CSVs/pcal_pass0p1.csv"]
-csv_files = ["CSVs/RME_xsec_results.csv"]
+csv_files = ["CSVs/test.csv"]
 # csv_files = ["CSVs/RME_xsec_results.csv", "CSVs/WorldData.csv", "CSVs/DG_xsec.csv"]
 
 with open(csv_files[0]) as f:

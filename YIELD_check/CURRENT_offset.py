@@ -10,7 +10,7 @@ import matplotlib.colors as mplcolors
 from scipy.optimize import curve_fit
 
 # Input file
-csvfile = "CSVs/current_offset.csv"
+csvfile = "CSVs/yield_check_hmsdis_4pass_c.csv"
 
 data = np.genfromtxt(csvfile,delimiter=",",names=True,dtype=None,encoding=None)
 
@@ -18,21 +18,21 @@ polarity_mask = data["polarity"] == "-"
 
 # runnum_mask = np.isin(data["runnum"], [24303, 24304, 24306, 24307, 24308])
 
-runnum_mask = ~np.isin(data["runnum"], [24495, 24496])
+runnum_mask = ~np.isin(data["runnum"], [0, 1])
 
-targ_mask = np.isin(data["targ"], ["C",])
+targ_mask = np.isin(data["target"], ["cu", "c", "lh2"])
 
-pass_mask = np.isin(data["pass"], [4])
+pass_mask = np.isin(data["beampass"], ["4Pass", "5Pass"])
 
 current_mask = (data["current"] > 10) & (data["current"] < 45)
 
-mask = polarity_mask & runnum_mask & targ_mask & pass_mask & current_mask
+mask = polarity_mask & runnum_mask & current_mask & targ_mask & pass_mask
 
 I = data["current"][mask]
 
-yield_norm = data["yield_norm"][mask]
+yield_norm = data["yield"][mask]
 
-yield_err = data["yield_norm_err"][mask]
+yield_err = data["yield_err"][mask]
 
 def fit(I, yield_corr, delta):
     return yield_corr * (1 + delta / I)
@@ -45,8 +45,8 @@ yield_corr_err, delta_err = np.sqrt(np.diag(pcov))
 print(f"Y_corr = {yield_corr_fit:.6f} ± {yield_corr_err:.6f}")
 print(f"delta = {delta_fit:.6f} ± {delta_err:.6f}")
 
-targs = np.unique(data["targ"][mask])
-passes = np.unique(data["pass"][mask])
+targs = np.unique(data["target"][mask])
+passes = np.unique(data["beampass"][mask])
 polarity = np.unique(data["polarity"][mask])
 
 targ_str = ", ".join(targs)

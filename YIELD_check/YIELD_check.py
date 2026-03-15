@@ -113,6 +113,8 @@ if selected_target_shortname in {"c", "cu", "al", "ld2", "lh2", "dummy"}:
 df = pd.DataFrame(results)
 
 df["runnum"] = pd.to_numeric(df["runnum"])
+df["target"] = selected_target_shortname
+df["beampass"] = f"{selected_beam_pass}Pass"
 df["current"] = pd.to_numeric(df["current"])
 df["yield"] = pd.to_numeric(df["yield"])
 df["yield_err"] = pd.to_numeric(df["yield_err"])

@@ -15,9 +15,9 @@ bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AU
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
                 #Now skipping the low current (< 10 uA) runs,
-                23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
-                24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
-                24498,24563,24911,24967,25047,25081,25406,25407,25416,25417,
+                #23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
+                #24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
+                #24498,24563,24911,24967,25047,25081,25406,25407,25416,25417,
                 #Now skipping some runs that have negative yields (?!),
                 25396, 25397]
 
@@ -84,20 +84,19 @@ if os.path.exists(bigtable_filepath):
                         print(f"Run {runnum} has no valid prescale (both -1), skipping...")
                         continue
                     
-                   
                     nu = abs(float(ebeam)) - abs(float(hms_p))
                     hms_th_rad = np.deg2rad(float(hms_th))
                     q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
                     epsilon = 1 / (1 + 2 * (1 + (nu**2 / q2)) * np.tan(hms_th_rad/ 2))**2
-                    
-                    # weight = float(ps) / (float(livetime) * float(trackeff))
 
                     current_offset_corr = 1
 
                     # if selected_target_shortname == "cu":
                     #     current_offset_corr = 1 / (1 + (0.279928 / float(ibeam) ))
 
-                    weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
+                    # weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
+
+                    weight = (float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
 
                     bigtable_lookup[runnum] = {"run_type": run_type,
                                                "start_time": start_time,
