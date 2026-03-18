@@ -94,8 +94,9 @@ variable_mc_map = {
     "H_dc_x_fp": "hsxfp",
     "H_dc_xp_fp": "hsxpfp",
     "H_dc_y_fp": "hsyfp",
-    "H_dc_yp_fp": "hsypfp"
-    }
+    "H_dc_yp_fp": "hsypfp",
+    "H_kin_W2": "w" #Altering the filling of this later
+}
 
 # -----------------------------------------------------
 # Binning
@@ -116,6 +117,7 @@ if selected_beam_pass == "4":
         "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
         "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
         "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+        "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),
     }
     
 if selected_beam_pass == "5":
@@ -134,6 +136,7 @@ if selected_beam_pass == "5":
         "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
         "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
         "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+        "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),
     }
 
 # -----------------------------------------------------
@@ -173,7 +176,13 @@ for i, runnum in enumerate(runnums):
              hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
 
              yvals = df_cut["H_gtr_y"].values
-             varvals = df_cut[var].values
+
+             if var == "H_kin_W2":
+                 if "H_kin_W" not in df_cut.columns:
+                     raise KeyError("H_kin_W branch missing - cannot compute H_kin_W2 for dummy!")
+                 varvals = df_cut["H_kin_W"].values**2
+             else:
+                 varvals = df_cut[var].values
 
              y_mid = 0.0
              upstream_mask = yvals < y_mid
@@ -195,8 +204,8 @@ for i, runnum in enumerate(runnums):
              weights_ld2[upstream_mask] = R_dummy_ld2_up * run_weight
              weights_ld2[downstream_mask] = R_dummy_ld2_down * run_weight
 
-             hist_lh2.fill(df_cut[var], weight=weights_lh2)
-             hist_ld2.fill(df_cut[var], weight=weights_ld2)
+             hist_lh2.fill(varvals, weight=weights_lh2)
+             hist_ld2.fill(varvals, weight=weights_ld2)
 
              counts_lh2 = hist_lh2.view().value
              counts_ld2 = hist_ld2.view().value
@@ -212,7 +221,12 @@ for i, runnum in enumerate(runnums):
              
          else:     
              hist = bh.Histogram(axis, storage=bh.storage.Weight())
-             hist.fill(df_cut[var], weight=np.full(len(df_cut[var]), run_weight))
+             if var == "H_kin_W2":
+                 values = df_cut["H_kin_W"].values**2
+             else:
+                 values = df_cut[var].values
+                 
+             hist.fill(values, weight=np.full(len(values), run_weight))
 
              counts = hist.view().value
              errors = np.sqrt(hist.view().variance)
@@ -255,16 +269,26 @@ for var, bins in custom_bins.items():
         hist_mc = bh.Histogram(axis, storage=bh.storage.Weight())
 
         if "weight" in df_mc_cut.columns:
-            deltatmp = df_mc_cut["hsdelta"].values
+            delta_temp = df_mc_cut["hsdelta"].values
 
-            h1 = 1.0069
-            h2 = 0.34018e-02
-            h3 = -0.71161e-03
-            h4 = -0.12060e-04
-            h5 = 0.11322e-04
-            h6 = -0.78222e-06
+            # Pass0p1 fit, using all targets
+            a = 1.010971e+00
+            b = 3.745011e-03
+            c = -9.858059e-04
+            d = -4.443637e-05
+            e = 1.259198e-05
+            f = -5.060609e-07
 
-            deltacorr = (h1 + h2 * deltatmp + h3 * deltatmp**2 + h4 * deltatmp**3 + h5 * deltatmp**4 + h6 * deltatmp**5)
+            # Pass0p1 fit, ommitting Cu
+            # a = 1.011366e+00
+            # b = 3.834919e-03
+            # c = -1.038554e-03
+            # d = -4.585118e-05
+            # e = 1.350843e-05
+            # f = -4.958934e-07
+
+
+            deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4 + f * delta_temp**5)
 
             if USING_DELTA_CORR:
                 event_weights = df_mc_cut["weight"].values * normfac * deltacorr
@@ -278,7 +302,12 @@ for var, bins in custom_bins.items():
         # print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
         # print("DEBUG: bins for this variable:", bins["min"], bins["max"])
         # print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
-        hist_mc.fill(df_mc_cut[mc_var].values, weight=event_weights)
+        if var == "H_kin_W2":
+            mc_values = df_mc_cut["w"].values**2
+        else:
+            mc_values = df_mc_cut[mc_var].values
+            
+        hist_mc.fill(mc_values, weight=event_weights)
         # print("DEBUG: hist sum after fill:", hist_mc.sum())
         # print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
 
@@ -297,10 +326,7 @@ for var, rows in hist_data.items():
     hist_df = pd.DataFrame(rows, columns=columns)
     if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         mc_row = ["MC", "0", "mc"] + mc_hist_data[var]
-        hist_df.loc[0] = mc_row
-        hist_df.index = range(len(hist_df))
-    else:
-        hist_df.index = range(len(hist_df))
+        hist_df = pd.concat([pd.DataFrame([mc_row], columns=columns), hist_df], ignore_index = True)
     
     output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_histo.csv"
     output_filepath = f"{output_dir}/{output_filename}"
@@ -310,9 +336,7 @@ for var, rows in hist_data.items():
     hist_err_df = pd.DataFrame(hist_err_data[var], columns=columns)
     if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         mc_err_row = ["MC", "0", "0"] + mc_hist_err[var]
-        hist_err_df.loc[0] = mc_err_row
-   
-    hist_err_df.index = range(len(hist_df))
+        hist_err_df = pd.concat([pd.DataFrame([mc_err_row], columns=columns), hist_err_df], ignore_index=True)
     
     output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_err.csv"
     output_err_filepath = f"{output_dir}/{output_err_filename}"

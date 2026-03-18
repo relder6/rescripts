@@ -33,10 +33,10 @@ else:
     selected_denom = input("Enter denominator target: ").strip().lower()
     nbins = int(input("Enter bin number: "))
     
-selected_beam_pass_to_energy_prefix = {
-    "1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."
-}
+selected_beam_pass_to_energy_prefix = {"1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."}
+
 beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
+
 if not beam_prefix:
     print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
     exit(1)
@@ -97,6 +97,8 @@ theta_4pass = vals["angle_4pass"]
 ebeam_5pass = vals["ebeam_5pass"]
 theta_5pass = vals["angle_5pass"]
 
+model_xsec_dir = "../../../mc-single-arm/util/dis_xec"
+
 xsec_ratio_dir = "../../XSEC/FORM_xsec/RATIOS"
 
 beam_passes = ["4pass", "5pass"]
@@ -140,7 +142,7 @@ for filepath in csv_files:
     df["w2"] = df["w"] ** 2
     df["bc_corr"] = 0.0
 
-    df_out = df[["exp", "A_num", "Z_num","A_denom","Z_denom","ebeam","theta","eprime","xbj", "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom", "xsec_ratio_final", "xsec_ratio_final_err", "bc_corr"]]
+    df_out = df[["exp", "A_num", "Z_num","A_denom","Z_denom","ebeam","theta","eprime","xbj", "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom", "xsec_ratio_final", "xsec_ratio_final_err", "bc_corr","xsec_model_num", "xsec_model_denom"]]
 
     df_out = df_out.dropna()
 
@@ -238,27 +240,107 @@ print(f"Bin centers ({nbins} bins):\n{bin_centers}")
 # -----------------------------------------------------
 # Now building input strings, collecting model xsec of bin centers
 # -----------------------------------------------------
-df_data["bc_xbj"] = bin_centers[df_data["bin_num"].to_numpy()]
+model_results = []
 
-df_data["bc_q2"] = df_data["q2"] * df_data["bc_xbj"] / df_data["xbj"]
+for beam_pass in beam_passes:
+    if beam_pass == "4pass":
+        theta_inp = theta_4pass
+        ebeam = ebeam_4pass
+    if beam_pass == "5pass":
+        theta_inp = theta_5pass
+        ebeam = ebeam_5pass
 
-df_data["emc"] = slac_emc_fit(df_data["xbj"],df_data["A_num"])
+    infile_names = {"num": f"{selected_run_type}_{beam_pass}_{num_short}",
+                    "denom": f"{selected_run_type}_{beam_pass}_{denom_short}"}
+    
+    for bin_center in bin_centers:
 
-df_data["bc_emc"] = slac_emc_fit(df_data["bc_xbj"],df_data["A_num"])
+        results_tmp = {}
 
-df_data["bc_corr"] = df_data["bc_emc"] / df_data["emc"]
+        for label, infile_name in infile_names.items():
+            input_string = f"1,{theta_inp:.3f},{bin_center:.6f},1,1\n{infile_name}\n"
+            # print(f"INPUT STRING: {input_string}")
+
+            try:
+                result = subprocess.run(["./calc_dis_xsec"], input=input_string, text=True, capture_output=True, cwd=model_xsec_dir)
+                # print("STDOUT:")
+                # print(result.stdout)
+                # print("STDERR:")
+                # print(result.stderr)
+                output = result.stdout
+
+                lines = output.split("\n")
+
+                model_xsec_value = np.nan
+                model_q2_value = np.nan
+            
+                found_header = False
+
+                for line in lines:
+                    if "ub/GeV/sr" in line:
+                        found_header = True
+                        continue
+
+                    if found_header:
+                        parts = line.split()
+                        if len(parts) >= 6:
+                            try:
+                                model_q2_value = float(parts[3])
+                                model_xsec_value = float(parts[-1])
+                                break
+                            except:
+                                pass
+                        
+                if np.isnan(model_xsec_value):
+                    print(f"Failed to parse xsec for {beam_pass}, bin {bin_center}")
+
+                results_tmp[label] = model_xsec_value
+                results_tmp[f"{label}_q2"] = model_q2_value
+
+            except Exception as e:
+                print(f"Error running calc_dis_xsec: {e}")
+                
+        model_results.append({"ebeam": ebeam,
+                              "bc_theta": theta_inp,
+                              "bc_xbj": bin_center,
+                              "bc_q2": results_tmp.get("num_q2", np.nan),
+                              "xsec_model_num": results_tmp.get("num", np.nan),
+                              "xsec_model_denom": results_tmp.get("denom", np.nan),})
+        
+df_centers = pd.DataFrame(model_results)
+center_to_bin = dict(zip(bin_centers, range(len(bin_centers))))
+df_centers["bin_num"] = df_centers["bc_xbj"].map(center_to_bin)
+
+print(f"\nXSEC Model at Bin Centers")
+print(df_centers)
+
+df_centers_bin = (df_centers.groupby(["bin_num", "ebeam"], as_index=False)[["xsec_model_num", "xsec_model_denom", "bc_xbj", "bc_q2"]].mean())
+
+df_data["bc_xsec_model_num"] = np.nan
+df_data["bc_xsec_model_denom"] = np.nan
+df_data["bc_xbj"] = np.nan
+df_data["bc_q2"] = np.nan
+
+for _, row in df_centers_bin.iterrows():
+    mask = (df_data["ebeam"] == row["ebeam"]) & (df_data["bin_num"] == row["bin_num"])
+    df_data.loc[mask, "bc_xsec_model_num"] = row["xsec_model_num"]
+    df_data.loc[mask, "bc_xsec_model_denom"] = row["xsec_model_denom"]
+    df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
+    df_data.loc[mask, "bc_q2"] = row["bc_q2"]
+
+df_data["bc_corr"] = ((df_data["bc_xsec_model_num"] / df_data["bc_xsec_model_denom"]) /(df_data["xsec_model_num"] / df_data["xsec_model_denom"]))
 
 m_p = 0.93827208943 # proton mass, GeV
 
 alpha = 1 / 137.035999177 # fine structure constant
 
-df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
+R_ld2 = 0.1725
 
 df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 
-df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
+df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
 
-R_ld2 = 0.1725
+df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
 
 df_data["bc_epsilon_p"] = df_data["bc_epsilon"] / ( 1 + df_data["bc_epsilon"] * R_ld2)
 
@@ -271,7 +353,7 @@ df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"] * d
 col_final = ["exp", "A_num", "Z_num", "A_denom", "Z_denom", "ebeam", "theta", "theta_rad", "eprime", "xbj",
              "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
              "xsec_ratio_final", "xsec_ratio_final_err",
-             "emc", "bin_num", "bc_emc", "bc_corr",
+             "bin_num", "bc_xsec_model_num", "bc_xsec_model_denom", "bc_corr",
              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
              "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err"]
 
@@ -281,6 +363,50 @@ df_final.to_csv(output_csv, index=False)
 
 print(f"Saved compiled CSV → {output_csv}")
 print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].max():.6f}")
+
+# df_data["bc_xbj"] = bin_centers[df_data["bin_num"].to_numpy()]
+
+# df_data["bc_q2"] = df_data["q2"] * df_data["bc_xbj"] / df_data["xbj"]
+
+# df_data["emc"] = slac_emc_fit(df_data["xbj"],df_data["A_num"])
+
+# df_data["bc_emc"] = slac_emc_fit(df_data["bc_xbj"],df_data["A_num"])
+
+# df_data["bc_corr"] = df_data["bc_emc"] / df_data["emc"]
+
+# m_p = 0.93827208943 # proton mass, GeV
+
+# alpha = 1 / 137.035999177 # fine structure constant
+
+# df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
+
+# df_data["theta_rad"] = np.deg2rad(df_data["theta"])
+
+# df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
+
+# R_ld2 = 0.1725
+
+# df_data["bc_epsilon_p"] = df_data["bc_epsilon"] / ( 1 + df_data["bc_epsilon"] * R_ld2)
+
+# df_data["bc_gamma"] = alpha / (2 * np.pi**2 * df_data["bc_q2"]) * (df_data["ebeam"] - df_data["bc_nu"]) / (df_data["ebeam"]) * (df_data["bc_nu"] * (1 - df_data["bc_xbj"])) / (1 - df_data["bc_epsilon"])
+
+# df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio_final"] * df_data["bc_corr"]
+
+# df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"] * df_data["bc_corr"]
+
+# col_final = ["exp", "A_num", "Z_num", "A_denom", "Z_denom", "ebeam", "theta", "theta_rad", "eprime", "xbj",
+#              "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
+#              "xsec_ratio_final", "xsec_ratio_final_err",
+#              "emc", "bin_num", "bc_emc", "bc_corr",
+#              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
+#              "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err"]
+
+# df_final = df_data[col_final]
+
+# df_final.to_csv(output_csv, index=False)
+
+# print(f"Saved compiled CSV → {output_csv}")
+# print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].max():.6f}")
 
 # -----------------------------------------------------
 # Plotting
@@ -308,14 +434,14 @@ for i in range(1, len(edges)-1):
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{selected_target_titlename} Binning Test (nbins={nbins})")
+plt.title(f"{num_long}/{denom_long} Binning Test (nbins={nbins})")
 
 plt.legend()
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
-plt.savefig("PNGs/{selected_run_type}_{num_short}_to_{denom_short}_binning_test.png")
+plt.savefig(f"PNGs/{selected_run_type}_{num_short}_to_{denom_short}_binning_test.png")
 
-# plt.show()
+plt.show()
 
 plt.close()
     

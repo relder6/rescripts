@@ -30,9 +30,9 @@ if len(sys.argv) > 4:
 else:
     nbins = int(input("Indicate number of bins: "))
 
-model_xsec_dir = "../../mc-single-arm/util/dis_xec"
+model_xsec_dir = "../../../mc-single-arm/util/dis_xec"
 
-xsec_dir = "../XSEC/FORM_xsec"
+xsec_dir = "../../XSEC/FORM_xsec"
 
 beam_passes = ["4pass", "5pass"]
 
@@ -86,6 +86,9 @@ df_data = pd.concat(all_rows, ignore_index=True)
 
 output_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_{selected_target_shortname}.csv"
 
+# -----------------------------------------------------
+# Determining the bin centers
+# -----------------------------------------------------
 selected_var = "xbj"
 
 df_xbj_minmax = (df_data.groupby("exp")[selected_var].agg(["min", "max"]).reset_index())
@@ -170,6 +173,27 @@ print(f"Overlap range: {overlap_min:.4f} → {overlap_max:.4f}")
 print(f"Stepsize: {stepsize:.4f}")
 print(f"Bin centers ({nbins} bins):\n{bin_centers}")
 
+bin_info = []
+
+for bin_idx, bin_center in enumerate(bin_centers):
+    mask = df_data["bin_num"] == bin_idx
+    bc_q2_list = []
+    exps = df_data["exp"].unique()
+    for exp in exps:
+        sub = df_data[(df_data["exp"] == exp) & mask]
+        if len(sub) < 2:
+            continue
+        x = sub[selected_var].to_numpy()
+        y = sub["q2"].to_numpy()
+        m, b = np.polyfit(x, y, 1)
+        bc_q2 = m * bin_center + b
+        bc_q2_list.append(bc_q2)
+    avg_q2 = np.mean(bc_q2_list)
+    bin_info.append({"bin_num": bin_idx, "bc_xbj": bin_center, "bc_q2": avg_q2})
+
+df_bins = pd.DataFrame(bin_info)
+print("Bin-centered x and Q² values:")
+print(df_bins)
 
 # -----------------------------------------------------
 # Now building input strings, collecting model xsec of bin centers
@@ -185,9 +209,17 @@ for beam_pass in beam_passes:
         ebeam = ebeam_5pass
         
     infile_name = f"{selected_run_type}_{beam_pass}_{selected_target_shortname}"
-    
-    for bin_center in bin_centers:
-        input_string = f"1,{theta_inp:.3f},{bin_center:.6f},1,1\n{infile_name}\n"
+
+    # The input string depends on the version of Dave's xsec tool, mc-single-arm/util/dis_xec/calc_dis_xsec
+    # Right now, the input string is flag (0 = fixed theta, bin in eprime; 1 = fixed theta, bin in xbj; 2 = fixed Q2, bin in xbj...
+    # fixed var (theta or Q2), <var>min, <var>step, <var>bin_num, then input filename
+
+    for _, bin_row in df_bins.iterrows():
+        bc_xbj = bin_row["bc_xbj"]
+        bc_q2 = bin_row["bc_q2"]
+        bin_num = bin_row["bin_num"]
+        
+        input_string = f"2\n{bc_q2:.6f}\n{bc_xbj:.6f}\n1\n1\n{infile_name}\n"
         # print(f"INPUT STRING: {input_string}")
 
         try:
@@ -227,7 +259,7 @@ for beam_pass in beam_passes:
                                   "Z": selected_target_Z,
                                   "ebeam": ebeam,
                                   "bc_theta": theta_inp,
-                                  "bc_xbj": bin_center,
+                                  "bc_xbj": bc_xbj,
                                   "bc_q2": model_q2_value,
                                   "xsec_model": model_xsec_value})
         
@@ -235,13 +267,41 @@ for beam_pass in beam_passes:
             print(f"Error running calc_dis_xsec: {e}")
 
 df_centers = pd.DataFrame(model_results)
-center_to_bin = dict(zip(bin_centers, range(len(bin_centers))))
-df_centers["bin_num"] = df_centers["bc_xbj"].map(center_to_bin)
+edges_centers = np.zeros(len(bin_centers)+1)
+
+if len(bin_centers) == 1:
+    # Only one bin, set edges around center
+    delta = 0.5 * stepsize 
+    edges_centers[0] = bin_centers[0] - delta
+    edges_centers[1] = bin_centers[0] + delta
+else:
+    # Multiple bins: use midpoints as before
+    edges_centers[1:-1] = (bin_centers[:-1] + bin_centers[1:]) / 2
+    edges_centers[0]  = bin_centers[0] - (bin_centers[1] - bin_centers[0])/2
+    edges_centers[-1] = bin_centers[-1] + (bin_centers[-1] - bin_centers[-2])/2
+
+df_centers["bin_num"] = np.digitize(df_centers["bc_xbj"], edges_centers) - 1
 
 print(f"\nXSEC Model at Bin Centers")
 print(df_centers)
 
+# -----------------------------------------------------
+# Computing additional values for the dataframe
+# -----------------------------------------------------
+m_p = 0.93827208943 # proton mass, GeV
+
+alpha = 1 / 137.035999177 # fine structure constant
+
 df_centers_bin = (df_centers.groupby(["bin_num", "ebeam"], as_index=False)[["xsec_model", "bc_xbj", "bc_q2"]].mean())
+
+df_data["theta_rad"] = np.deg2rad(df_data["theta"])
+df_data["epsilon"] = df_data["epsilon"]
+df_data["nu"] = (1 / (2 * m_p)) * df_data["q2"] / df_data["xbj"]
+
+df_data["gamma"] = (alpha / (2 * np.pi**2 * df_data["q2"])* (df_data["ebeam"] - df_data["nu"]) / df_data["ebeam"]* (df_data["nu"] * (1 - df_data["xbj"])) / (1 - df_data["epsilon"]))
+
+df_data["sigma_R"] = df_data["xsec_exp"] / df_data["gamma"]
+df_data["sigma_R_err"] = df_data["xsec_exp_err"] / df_data["gamma"]
 
 df_data["bc_xsec_model"] = np.nan
 df_data["bc_xbj"] = np.nan
@@ -253,15 +313,9 @@ for _, row in df_centers_bin.iterrows():
     df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
     df_data.loc[mask, "bc_q2"] = row["bc_q2"]
 
-df_data["bc_corr"] = df_data["bc_xsec_model"] / df_data["xsec_exp"]
-
-m_p = 0.93827208943 # proton mass, GeV
-
-alpha = 1 / 137.035999177 # fine structure constant
+df_data["bc_corr"] = df_data["bc_xsec_model"] / df_data["xsec_model"]
 
 df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
-
-df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 
 df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
 
@@ -271,10 +325,16 @@ df_data["bc_sigma_R"] = df_data["xsec_exp"] * df_data["bc_corr"] / df_data["bc_g
 
 df_data["bc_sigma_R_err"] = df_data["xsec_exp_err"] * df_data["bc_corr"] / df_data["bc_gamma"]
 
-col_final = ["exp", "A", "Z", "ebeam", "theta", "theta_rad", "eprime", "xbj",
-             "q2", "w2", "epsilon", "xsec_exp", "xsec_exp_err",
-             "xsec_model", "bc_xsec_model", "bc_corr", "bin_num",
-             "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_gamma",
+
+col_final = ["exp", "A", "Z", "ebeam", "theta", "theta_rad",
+             "eprime", "xbj", "q2", "w2",
+             "epsilon", "nu",      
+             "xsec_exp", "xsec_exp_err",
+             "xsec_model", "gamma",
+             "sigma_R", "sigma_R_err",
+             "bc_xsec_model", "bc_corr", "bin_num",
+             "bc_nu", "bc_gamma",
+             "bc_xbj", "bc_q2", "bc_epsilon",
              "bc_sigma_R", "bc_sigma_R_err"]
 
 df_final = df_data[col_final]
@@ -317,7 +377,7 @@ plt.grid(axis="both", linestyle="--", alpha=0.8)
 
 plt.savefig("PNGs/{selected_run_type}_{selected_target_shortname}_binning_test.png")
 
-# plt.show()
+plt.show()
 
 plt.close()
     

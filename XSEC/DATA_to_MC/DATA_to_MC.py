@@ -21,7 +21,7 @@ selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, s
 # -----------------------------------------------------
 base_dir = f"../MAKE_csvs/{selected_target_shortname.upper()}"
     
-variables = ["H_gtr_dp", "H_gtr_ph", "H_gtr_th", "H_kin_Q2", "H_kin_x_bj", "H_kin_W", "H_gtr_p", "H_gtr_y", "H_gtr_th", "H_gtr_ph", "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp"]
+variables = ["H_gtr_dp", "H_gtr_ph", "H_gtr_th", "H_kin_Q2", "H_kin_x_bj", "H_kin_W", "H_gtr_p", "H_gtr_y", "H_gtr_th", "H_gtr_ph", "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp", "H_kin_W2"]
 
 pdf_output = f"PDFs/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
 pp = PdfPages(pdf_output)

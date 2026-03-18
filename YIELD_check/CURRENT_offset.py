@@ -24,7 +24,7 @@ targ_mask = np.isin(data["target"], ["cu", "c", "lh2"])
 
 pass_mask = np.isin(data["beampass"], ["4Pass", "5Pass"])
 
-current_mask = (data["current"] > 10) & (data["current"] < 45)
+current_mask = (data["current"] > 5) & (data["current"] < 45)
 
 mask = polarity_mask & runnum_mask & current_mask & targ_mask & pass_mask
 
