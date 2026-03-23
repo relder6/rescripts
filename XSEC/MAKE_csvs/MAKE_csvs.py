@@ -271,13 +271,26 @@ for var, bins in custom_bins.items():
         if "weight" in df_mc_cut.columns:
             delta_temp = df_mc_cut["hsdelta"].values
 
+            if selected_target_shortname in {"c", "cu"}:
+                a = 1.007701e+00
+                b = 3.196105e-03
+                c = -3.538785e-04
+                d = -6.419247e-05
+
+            elif selected_target_shortname in {"ld2", "lh2"}:
+                a = 1.005920e+00
+                b = 5.115397e-03
+                c = -2.658848e-04
+                d = -9.315731e-05
+
+
             # Pass0p1 fit, using all targets
-            a = 1.010971e+00
-            b = 3.745011e-03
-            c = -9.858059e-04
-            d = -4.443637e-05
-            e = 1.259198e-05
-            f = -5.060609e-07
+            # a = 1.010971e+00
+            # b = 3.745011e-03
+            # c = -9.858059e-04
+            # d = -4.443637e-05
+            # e = 1.259198e-05
+            # f = -5.060609e-07
 
             # Pass0p1 fit, ommitting Cu
             # a = 1.011366e+00
@@ -287,8 +300,7 @@ for var, bins in custom_bins.items():
             # e = 1.350843e-05
             # f = -4.958934e-07
 
-
-            deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4 + f * delta_temp**5)
+            deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3) # + e * delta_temp**4 + f * delta_temp**5)
 
             if USING_DELTA_CORR:
                 event_weights = df_mc_cut["weight"].values * normfac * deltacorr

@@ -150,6 +150,9 @@ df_data = pd.concat(all_rows, ignore_index=True)
 
 output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_short}_to_{denom_short}.csv"
 
+# -----------------------------------------------------
+# Determining the bin centers
+# -----------------------------------------------------
 selected_var = "xbj"
 
 df_xbj_minmax = (df_data.groupby("exp")[selected_var].agg(["min", "max"]).reset_index())
@@ -234,6 +237,27 @@ print(f"Overlap range: {overlap_min:.4f} → {overlap_max:.4f}")
 print(f"Stepsize: {stepsize:.4f}")
 print(f"Bin centers ({nbins} bins):\n{bin_centers}")
 
+bin_info = []
+
+for bin_idx, bin_center in enumerate(bin_centers):
+    mask = df_data["bin_num"] == bin_idx
+    bc_q2_list = []
+    exps = df_data["exp"].unique()
+    for exp in exps:
+        sub = df_data[(df_data["exp"] == exp) & mask]
+        if len(sub) < 2:
+            continue
+        x = sub[selected_var].to_numpy()
+        y = sub["q2"].to_numpy()
+        m, b = np.polyfit(x, y, 1)
+        bc_q2 = m * bin_center + b
+        bc_q2_list.append(bc_q2)
+    avg_q2 = np.mean(bc_q2_list)
+    bin_info.append({"bin_num": bin_idx, "bc_xbj": bin_center, "bc_q2": avg_q2})
+
+df_bins = pd.DataFrame(bin_info)
+print("Bin-centered x and Q² values:")
+print(df_bins)
 
 # -----------------------------------------------------
 # Now building input strings, collecting model xsec of bin centers
@@ -268,9 +292,15 @@ df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio_final"] * df_data["
 
 df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"] * df_data["bc_corr"]
 
+df_data["epsilon_p"] = df_data["epsilon"] / (1 + df_data["epsilon"] * R_ld2)
+
+df_data["sigma_num_to_sigma_denom"] = df_data["xsec_ratio_final"]
+
+df_data["sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"]
+
 col_final = ["exp", "A_num", "Z_num", "A_denom", "Z_denom", "ebeam", "theta", "theta_rad", "eprime", "xbj",
-             "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
-             "xsec_ratio_final", "xsec_ratio_final_err",
+             "q2", "w2", "epsilon", "epsilon_p", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
+             "xsec_ratio_final", "xsec_ratio_final_err", "sigma_num_to_sigma_denom", "sigma_num_to_sigma_denom_err",
              "emc", "bin_num", "bc_emc", "bc_corr",
              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
              "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err"]

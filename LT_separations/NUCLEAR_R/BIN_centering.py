@@ -220,7 +220,7 @@ for beam_pass in beam_passes:
         bin_num = bin_row["bin_num"]
         
         input_string = f"2\n{bc_q2:.6f}\n{bc_xbj:.6f}\n1\n1\n{infile_name}\n"
-        # print(f"INPUT STRING: {input_string}")
+        print(f"INPUT STRING: {input_string}")
 
         try:
             result = subprocess.run(["./calc_dis_xsec"], input=input_string, text=True, capture_output=True, cwd=model_xsec_dir)
@@ -231,10 +231,13 @@ for beam_pass in beam_passes:
             output = result.stdout
 
             lines = output.split("\n")
-
-            model_xsec_value = np.nan
-            model_q2_value = np.nan
             
+            model_eprime = np.nan
+            model_theta = np.nan
+            model_xbj = np.nan
+            model_q2 = np.nan
+            model_xsec = np.nan
+                 
             found_header = False
 
             for line in lines:
@@ -246,22 +249,26 @@ for beam_pass in beam_passes:
                     parts = line.split()
                     if len(parts) >= 6:
                         try:
-                            model_q2_value = float(parts[3])
-                            model_xsec_value = float(parts[-1])
+                            model_eprime = float(parts[0])
+                            model_theta = float(parts[1])
+                            model_xbj = float(parts[2])
+                            model_q2 = float(parts[3])
+                            model_xsec = float(parts[-1])
                             break
                         except:
                             pass
                         
-            if model_xsec_value is np.nan:
+            if model_xsec is np.nan:
                 print(f"Failed to parse xsec for {beam_pass}, bin {bin_center}")
                 
             model_results.append({"A": selected_target_A,
                                   "Z": selected_target_Z,
                                   "ebeam": ebeam,
-                                  "bc_theta": theta_inp,
+                                  "bc_eprime": model_eprime,
+                                  "bc_theta": model_theta,
                                   "bc_xbj": bc_xbj,
-                                  "bc_q2": model_q2_value,
-                                  "xsec_model": model_xsec_value})
+                                  "bc_q2": model_q2,
+                                  "bc_xsec_model": model_xsec})
         
         except Exception as e:
             print(f"Error running calc_dis_xsec: {e}")
@@ -292,7 +299,7 @@ m_p = 0.93827208943 # proton mass, GeV
 
 alpha = 1 / 137.035999177 # fine structure constant
 
-df_centers_bin = (df_centers.groupby(["bin_num", "ebeam"], as_index=False)[["xsec_model", "bc_xbj", "bc_q2"]].mean())
+df_centers_bin = (df_centers.groupby(["bin_num", "ebeam"], as_index=False)[["bc_xsec_model", "bc_xbj", "bc_q2", "bc_eprime", "bc_theta"]].mean())
 
 df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 df_data["epsilon"] = df_data["epsilon"]
@@ -303,21 +310,30 @@ df_data["gamma"] = (alpha / (2 * np.pi**2 * df_data["q2"])* (df_data["ebeam"] - 
 df_data["sigma_R"] = df_data["xsec_exp"] / df_data["gamma"]
 df_data["sigma_R_err"] = df_data["xsec_exp_err"] / df_data["gamma"]
 
-df_data["bc_xsec_model"] = np.nan
-df_data["bc_xbj"] = np.nan
-df_data["bc_q2"] = np.nan
+# df_data["bc_xsec_model"] = np.nan
+# df_data["bc_xbj"] = np.nan
+# df_data["bc_q2"] = np.nan
+# df_data["bc_eprime"] = np.nan
+# df_data["bc_theta"] = np.nan
 
-for _, row in df_centers_bin.iterrows():
-    mask = (df_data["ebeam"] == row["ebeam"]) & (df_data["bin_num"] == row["bin_num"])
-    df_data.loc[mask, "bc_xsec_model"] = row["xsec_model"]
-    df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
-    df_data.loc[mask, "bc_q2"] = row["bc_q2"]
+# for _, row in df_centers_bin.iterrows():
+#     mask = (df_data["ebeam"] == row["ebeam"]) & (df_data["bin_num"] == row["bin_num"])
+#     df_data.loc[mask, "bc_xsec_model"] = row["bc_xsec_model"]
+#     df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
+#     df_data.loc[mask, "bc_q2"] = row["bc_q2"]
+#     df_data.loc[mask, "bc_eprime"] = row["bc_eprime"]
+#     df_data.loc[mask, "bc_eprime"] = row["bc_eprime"]
+
+df_data = df_data.merge(df_centers_bin[["bin_num", "ebeam", "bc_xsec_model", "bc_xbj", "bc_q2", "bc_eprime", "bc_theta"]],
+                        on=["bin_num", "ebeam"],how="left",)
+
+df_data["bc_theta_rad"] = np.deg2rad(df_data["bc_theta"])
 
 df_data["bc_corr"] = df_data["bc_xsec_model"] / df_data["xsec_model"]
 
-df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
+df_data["bc_nu"] = df_data["ebeam"] - df_data["bc_eprime"]
 
-df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
+df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["bc_theta_rad"]/2)**2)**(-1)
 
 df_data["bc_gamma"] = alpha / (2 * np.pi**2 * df_data["bc_q2"]) * (df_data["ebeam"] - df_data["bc_nu"]) / (df_data["ebeam"]) * (df_data["bc_nu"] * (1 - df_data["bc_xbj"])) / (1 - df_data["bc_epsilon"])
 
@@ -332,9 +348,10 @@ col_final = ["exp", "A", "Z", "ebeam", "theta", "theta_rad",
              "xsec_exp", "xsec_exp_err",
              "xsec_model", "gamma",
              "sigma_R", "sigma_R_err",
-             "bc_xsec_model", "bc_corr", "bin_num",
-             "bc_nu", "bc_gamma",
-             "bc_xbj", "bc_q2", "bc_epsilon",
+             "bin_num", "bc_corr",
+             "bc_eprime", "bc_xbj", "bc_q2",
+             "bc_epsilon", "bc_nu",
+             "bc_xsec_model", "bc_gamma",
              "bc_sigma_R", "bc_sigma_R_err"]
 
 df_final = df_data[col_final]

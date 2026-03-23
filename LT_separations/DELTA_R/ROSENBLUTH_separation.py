@@ -11,6 +11,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
 from scipy.optimize import curve_fit
+from collections import defaultdict
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -100,9 +101,6 @@ xsec_ratio_dir = "../../XSEC/FORM_xsec/RATIOS"
 
 beam_passes = ["4pass", "5pass"]
 
-# -----------------------------------------------------
-# Files
-# -----------------------------------------------------
 os.makedirs("CSVs", exist_ok=True)
 bc_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_short}_to_{denom_short}.csv"
 
@@ -111,116 +109,118 @@ pdf_output = f"PDFs/DELTA_R_{selected_run_type.upper()}_rosenbluth_separation_{n
 pp = PdfPages(pdf_output)
 
 # -----------------------------------------------------
+# Reading the csv
+# -----------------------------------------------------
+df = pd.read_csv(bc_csv)
+
+required_cols = ["bin_num", "xbj", "q2", "epsilon_p", "sigma_num_to_sigma_denom", "sigma_num_to_sigma_denom_err",
+                 "bc_xbj", "bc_q2", "bc_epsilon_p", "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err",]
+
+missing = [c for c in required_cols if c not in df.columns]
+
+if missing:
+    raise ValueError(f"Missing columns in {bc_csv}: {missing}")
+
+# -----------------------------------------------------
 # Readinging in bc_csv in dictionary by bin num
 # -----------------------------------------------------
-bin_data = {}
+bc_data = {}
+data = {}
 
-with open(bc_csv, "r", newline="") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        try:
-            bin_num = int(row["bin_num"])
-            epsilon_p = float(row["bc_epsilon_p"])
-            xsec_ratio = float(row["bc_sigma_num_to_sigma_denom"])
-            xsec_ratio_err = float(row["bc_sigma_num_to_sigma_denom_err"])
-            xbj = float(row["bc_xbj"])
-            q2 = float(row["bc_q2"])
-
-            if bin_num not in bin_data:
-                bin_data[bin_num] = {"epsilon_p": [],
-                                     "xsec_ratio": [],
-                                     "xsec_ratio_err": [],
-                                     "xbj": [],
-                                     "q2": [],}
-            bin_data[bin_num]["epsilon_p"].append(epsilon_p)
-            bin_data[bin_num]["xsec_ratio"].append(xsec_ratio)
-            bin_data[bin_num]["xsec_ratio_err"].append(xsec_ratio_err)
-            bin_data[bin_num]["xbj"].append(xbj)
-            bin_data[bin_num]["q2"].append(q2)
-            
-        except KeyError:
-            continue
-        except ValueError:
-            continue
+for bin_num, sub in df.groupby("bin_num"):
+    
+    bc_data[bin_num] = {"epsilon_p": sub["bc_epsilon_p"].to_numpy(),
+                        "xsec_ratio": sub["bc_sigma_num_to_sigma_denom"].to_numpy(),
+                        "xsec_ratio_err": sub["bc_sigma_num_to_sigma_denom_err"].to_numpy(),
+                        "xbj": sub["bc_xbj"].to_numpy(),
+                        "q2": sub["bc_q2"].to_numpy(),}
+    
+    data[bin_num] = {"epsilon_p": sub["epsilon_p"].to_numpy(),
+                     "xsec_ratio": sub["sigma_num_to_sigma_denom"].to_numpy(),
+                     "xsec_ratio_err": sub["sigma_num_to_sigma_denom_err"].to_numpy(),
+                     "xbj": sub["xbj"].to_numpy(),
+                     "q2": sub["q2"].to_numpy(),}
 
 def linear_fit(x, intercept, slope):
     return intercept + slope * x
 
 fit_results = []
+epsp_rows = []
 
 with PdfPages(pdf_output) as pp:
-    print(f"Found {len(bin_data)} bins. Processing...")
+    for bin_num in sorted(bc_data.keys()):
 
-    for bin_num, data in bin_data.items():
-        epsp = np.array(data["epsilon_p"])
-        ratio = np.array(data["xsec_ratio"])
-        ratio_err = np.array(data["xsec_ratio_err"])
+        epsp_bc = np.array(bc_data[bin_num]["epsilon_p"])
+        ratio_bc = np.array(bc_data[bin_num]["xsec_ratio"])
+        ratio_err_bc = np.array(bc_data[bin_num]["xsec_ratio_err"])
+        epsp_raw = np.array(data[bin_num]["epsilon_p"])
+        ratio_raw = np.array(data[bin_num]["xsec_ratio"])
+        ratio_err_raw = np.array(data[bin_num]["xsec_ratio_err"])
 
-        epsp_unique = {}
-        for e, r, rerr in zip(epsp, ratio, ratio_err):
-            if e not in epsp_unique:
-                epsp_unique[e] = {"ratio": [], "ratio_err": []}
-            epsp_unique[e]["ratio"].append(r)
-            epsp_unique[e]["ratio_err"].append(rerr)
+        xbj_arr = np.array(bc_data[bin_num]["xbj"])
+        q2_arr = np.array(bc_data[bin_num]["q2"])
+        xbjavg = np.mean(xbj_arr)
+        n_points = len(q2_arr)
+        q2avg = np.mean(q2_arr)
+        q2max = np.max(q2_arr)
+        q2min = np.min(q2_arr)
+        q2_err = np.std(q2_arr, ddof=1) if n_points > 2 else (q2max - q2min) / 2
 
-        epsp = []
-        ratio = []
-        ratio_err = []
+        epsp_unique = defaultdict(lambda: {"ratio": [], "ratio_err": []})
 
-        for e, vals in epsp_unique.items():
-            r = np.array(vals["ratio"])
-            rerr = np.array(vals["ratio_err"])
+        for epsp, rat, rat_err in zip(epsp_bc, ratio_bc, ratio_err_bc):
+            epsp_unique[epsp]["ratio"].append(rat)
+            epsp_unique[epsp]["ratio_err"].append(rat_err)
 
-            weights = 1 / rerr**2
-            r_avg = np.sum(r * weights) / np.sum(weights)
-            r_err = np.sqrt(1 / np.sum(weights))
+        epsp_comb, rat_comb, rat_err_comb = [], [], []
 
-            epsp.append(e)
-            ratio.append(r_avg)
-            ratio_err.append(r_err)
+        for epsp, vals in epsp_unique.items():
+            rat_arr = np.array(vals["ratio"])
+            rat_err_arr = np.array(vals["ratio_err"])
+            w = 1.0 / rat_err_arr**2
+            rat_avg = np.sum(rat_arr * w) / np.sum(w)
+            rat_err = np.sqrt(1.0 / np.sum(w))
+            epsp_comb.append(epsp)
+            rat_comb.append(rat_avg)
+            rat_err_comb.append(rat_err)
 
-        epsp = np.array(epsp)
-        ratio = np.array(ratio)
-        ratio_err = np.array(ratio_err)
+        epsp_comb = np.array(epsp_comb)
+        rat_comb = np.array(rat_comb)
+        rat_err_comb = np.array(rat_err_comb)
 
-        xbjavg = np.mean(data["xbj"])
-        n_points = len(data["q2"])
-        q2avg = np.mean(data["q2"])
-        q2max = np.max(data["q2"])
-        q2min = np.min(data["q2"])
-        q2_err = np.std(data["q2"], ddof=1) if n_points > 2 else (q2max - q2min)/2
-
-        popt, pcov = curve_fit(linear_fit, epsp, ratio, sigma=ratio_err, absolute_sigma=True)
+        popt, pcov = curve_fit(linear_fit, epsp_comb, rat_comb, sigma=rat_err_comb, absolute_sigma=True)
         intercept, slope = popt
-        int_err = np.sqrt(pcov[0,0])
-        slope_err = np.sqrt(pcov[1,1])
-        R = float(slope) / float(intercept)
-        R_err = np.sqrt((pcov[1,1] / intercept**2) + (slope**2 * pcov[0,0] / intercept**4) - (2 * slope * pcov[0,1] / intercept**3))
+        int_err = np.sqrt(pcov[0, 0])
+        slope_err = np.sqrt(pcov[1, 1])
 
-        print(f"bin {bin_num}: xbj = {xbjavg:.3f}, q2 = {q2avg:.3f} ± {q2_err:.3f}")
-        print(f"σ_A - σ_T = {slope:.4f} ± {slope_err:.4f}")
+        fig, ax = plt.subplots(figsize = (6, 5))
 
-        fit_results.append({"bin_num": bin_num,
-                            "xbj": xbjavg,
-                            "q2_avg": q2avg,
-                            "q2_err": q2_err,
-                            "delta_R": slope,
-                            "delta_R_err": slope_err})
-        
-        fig, ax = plt.subplots(figsize=(6, 5))
-        
-        ax.errorbar(epsp, ratio, yerr=ratio_err, fmt="o", color="navy", markersize = 4)
+        ax.errorbar(epsp_raw, ratio_raw, yerr = ratio_err_raw, fmt = "o", color = "gray", alpha = 0.4, markersize = 3, label = "pre bin-centering")
 
-        # Fit evaluated across full x-axis [0, 1]
-        x_full = np.linspace(0.0, 1.0, 200)
-        y_full = linear_fit(x_full, intercept, slope)
-        ax.plot(x_full,y_full,"--",color="red",label=("Linear fit: y = mx + b\n"
-                                                      rf"$\Delta R = {slope:.4f} \pm {slope_err:.4f}$"))
+        ax.errorbar(epsp_bc, ratio_bc, yerr = ratio_err_bc, fmt = "o", color = "navy", alpha = 0.8, markersize = 3,label = "bin-centered points")
+
+        ax.errorbar(epsp_comb, rat_comb, yerr = rat_err_comb, fmt = "o", color = "red", markersize = 5,label = "weighted avg per ε'")
+
+        epsp_min = min(epsp_raw.min(), epsp_bc.min(), epsp_comb.min())
+        epsp_max = max(epsp_raw.max(), epsp_bc.max(), epsp_comb.max())
+        x_fit = np.linspace(epsp_min, epsp_max, 200)
+        y_fit = linear_fit(x_fit, intercept, slope)
+        ax.plot(x_fit, y_fit, "--", color="red",label=("Linear fit\n"
+                                                       rf"$\Delta R = {slope:.4f} \pm {slope_err:.4f}$"))
+
+        all_rat = np.concatenate([ratio_raw, ratio_bc, rat_comb])
+                
+        y_min, y_max = all_rat.min(), all_rat.max()
+                
+        margin = 0.1
+        dy = margin * (y_max - y_min if y_max > y_min else 1.0)
+        ax.set_xlim(epsp_min - 0.05, epsp_max + 0.05)
+        ax.set_ylim(y_min - dy, y_max + dy)
 
         ax.set_title(f"{num_long}/{denom_long} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {slope:.4f} ± {slope_err:.4f}", fontsize=10)
         ax.set_xlabel(r"$\epsilon$'")
         ax.set_ylabel(r"$ \sigma_A / \sigma_D$")
-        ax.set_xlim(0, 1)
+        
         ax.legend(fontsize=8)
         ax.grid(True)
 
@@ -231,3 +231,88 @@ print(f"PDF saved to {pdf_output}")
 csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_{num_short}_to_{denom_short}.csv"
 pd.DataFrame(fit_results).to_csv(csv_output, index=False)
 print(f"CSV of fits saved to {csv_output}")
+            
+
+        
+                           
+
+#     for bin_num, data in bin_data.items():
+#         epsp = np.array(data["epsilon_p"])
+#         ratio = np.array(data["xsec_ratio"])
+#         ratio_err = np.array(data["xsec_ratio_err"])
+
+#         epsp_unique = {}
+#         for e, r, rerr in zip(epsp, ratio, ratio_err):
+#             if e not in epsp_unique:
+#                 epsp_unique[e] = {"ratio": [], "ratio_err": []}
+#             epsp_unique[e]["ratio"].append(r)
+#             epsp_unique[e]["ratio_err"].append(rerr)
+
+#         epsp = []
+#         ratio = []
+#         ratio_err = []
+
+#         for e, vals in epsp_unique.items():
+#             r = np.array(vals["ratio"])
+#             rerr = np.array(vals["ratio_err"])
+
+#             weights = 1 / rerr**2
+#             r_avg = np.sum(r * weights) / np.sum(weights)
+#             r_err = np.sqrt(1 / np.sum(weights))
+
+#             epsp.append(e)
+#             ratio.append(r_avg)
+#             ratio_err.append(r_err)
+
+#         epsp = np.array(epsp)
+#         ratio = np.array(ratio)
+#         ratio_err = np.array(ratio_err)
+
+#         xbjavg = np.mean(data["xbj"])
+#         n_points = len(data["q2"])
+#         q2avg = np.mean(data["q2"])
+#         q2max = np.max(data["q2"])
+#         q2min = np.min(data["q2"])
+#         q2_err = np.std(data["q2"], ddof=1) if n_points > 2 else (q2max - q2min)/2
+
+#         popt, pcov = curve_fit(linear_fit, epsp, ratio, sigma=ratio_err, absolute_sigma=True)
+#         intercept, slope = popt
+#         int_err = np.sqrt(pcov[0,0])
+#         slope_err = np.sqrt(pcov[1,1])
+#         R = float(slope) / float(intercept)
+#         R_err = np.sqrt((pcov[1,1] / intercept**2) + (slope**2 * pcov[0,0] / intercept**4) - (2 * slope * pcov[0,1] / intercept**3))
+
+#         print(f"bin {bin_num}: xbj = {xbjavg:.3f}, q2 = {q2avg:.3f} ± {q2_err:.3f}")
+#         print(f"σ_A - σ_T = {slope:.4f} ± {slope_err:.4f}")
+
+#         fit_results.append({"bin_num": bin_num,
+#                             "xbj": xbjavg,
+#                             "q2_avg": q2avg,
+#                             "q2_err": q2_err,
+#                             "delta_R": slope,
+#                             "delta_R_err": slope_err})
+        
+#         fig, ax = plt.subplots(figsize=(6, 5))
+        
+#         ax.errorbar(epsp, ratio, yerr=ratio_err, fmt="o", color="navy", markersize = 4)
+
+#         # Fit evaluated across full x-axis [0, 1]
+#         x_full = np.linspace(0.0, 1.0, 200)
+#         y_full = linear_fit(x_full, intercept, slope)
+#         ax.plot(x_full,y_full,"--",color="red",label=("Linear fit: y = mx + b\n"
+#                                                       rf"$\Delta R = {slope:.4f} \pm {slope_err:.4f}$"))
+
+#         ax.set_title(f"{num_long}/{denom_long} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {slope:.4f} ± {slope_err:.4f}", fontsize=10)
+#         ax.set_xlabel(r"$\epsilon$'")
+#         ax.set_ylabel(r"$ \sigma_A / \sigma_D$")
+#         ax.set_xlim(0, 1)
+#         ax.legend(fontsize=8)
+#         ax.grid(True)
+
+#         pp.savefig(fig)
+#         plt.close(fig)
+
+# print(f"PDF saved to {pdf_output}")
+# csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_{num_short}_to_{denom_short}.csv"
+# pd.DataFrame(fit_results).to_csv(csv_output, index=False)
+# print(f"CSV of fits saved to {csv_output}")

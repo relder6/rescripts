@@ -10,7 +10,7 @@ import matplotlib.colors as mplcolors
 from scipy.optimize import curve_fit
 
 # Input file
-csvfile = "CSVs/yield_check_hmsdis_4pass_c.csv"
+csvfile = "CSVs/yield_check_hmsdis_4pass_cu.csv"
 
 data = np.genfromtxt(csvfile,delimiter=",",names=True,dtype=None,encoding=None)
 
