@@ -276,8 +276,8 @@ for beam_pass in beam_passes:
         theta_inp = theta_5pass
         ebeam = ebeam_5pass
 
-    infile_names = {"num": f"{selected_run_type}_{beam_pass}_{num_short}",
-                    "denom": f"{selected_run_type}_{beam_pass}_{denom_short}"}
+    infile_names = {"bc_num": f"{selected_run_type}_{beam_pass}_{num_short}",
+                    "bc_denom": f"{selected_run_type}_{beam_pass}_{denom_short}"}
 
     # The input string depends on the version of Dave's xsec tool, mc-single-arm/util/dis_xec/calc_dis_xsec
     # Right now, the input string is flag (0 = fixed theta, bin in eprime; 1 = fixed theta, bin in xbj; 2 = fixed Q2, bin in xbj...
@@ -306,8 +306,11 @@ for beam_pass in beam_passes:
 
                 lines = output.split("\n")
 
-                model_xsec_value = np.nan
-                model_q2_value = np.nan
+                model_xsec = np.nan
+                model_q2 = np.nan
+                model_xbj = np.nan
+                model_eprime = np.nan
+                model_theta = np.nan
             
                 found_header = False
 
@@ -320,48 +323,70 @@ for beam_pass in beam_passes:
                         parts = line.split()
                         if len(parts) >= 6:
                             try:
-                                model_q2_value = float(parts[3])
-                                model_xsec_value = float(parts[-1])
+                                model_eprime = float(parts[0])
+                                model_theta = float(parts[1])
+                                model_xbj = float(parts[2])
+                                model_q2 = float(parts[3])
+                                model_xsec = float(parts[-1])
                                 break
                             except:
                                 pass
                         
-                if np.isnan(model_xsec_value):
+                if np.isnan(model_xsec):
                     print(f"Failed to parse xsec for {beam_pass}, bin {bin_center}")
 
-                results_tmp[label] = model_xsec_value
-                results_tmp[f"{label}_q2"] = model_q2_value
+                results_tmp[f"{label}_xsec_model"] = model_xsec
+                results_tmp[f"{label}_eprime"] = model_eprime
+                results_tmp[f"{label}_theta"] = model_theta
+                results_tmp[f"{label}_xbj"] = model_xbj
+                results_tmp[f"{label}_q2"] = model_q2
+                
 
             except Exception as e:
                 print(f"Error running calc_dis_xsec: {e}")
                 
         model_results.append({"ebeam": ebeam,
-                              "bc_theta": theta_inp,
-                              "bc_xbj": bin_center,
-                              "bc_q2": results_tmp.get("num_q2", np.nan),
-                              "xsec_model_num": results_tmp.get("num", np.nan),
-                              "xsec_model_denom": results_tmp.get("denom", np.nan),})
+                              "bc_eprime": results_tmp.get("bc_num_eprime", np.nan),
+                              "bc_theta": results_tmp.get("bc_num_theta", np.nan),
+                              "bc_xbj": results_tmp.get("bc_num_xbj", np.nan),
+                              "bc_q2": results_tmp.get("bc_num_q2", np.nan),
+                              "bc_xsec_model_num": results_tmp.get("bc_num_xsec_model", np.nan),
+                              "bc_xsec_model_denom": results_tmp.get("bc_denom_xsec_model", np.nan),})
         
 df_centers = pd.DataFrame(model_results)
-center_to_bin = dict(zip(bin_centers, range(len(bin_centers))))
-df_centers["bin_num"] = df_centers["bc_xbj"].map(center_to_bin)
+edges_centers = np.zeros(len(bin_centers)+1)
+
+if len(bin_centers) == 1:
+    # Only one bin, set edges around center
+    delta = 0.5 * stepsize 
+    edges_centers[0] = bin_centers[0] - delta
+    edges_centers[1] = bin_centers[0] + delta
+else:
+    # Multiple bins: use midpoints as before
+    edges_centers[1:-1] = (bin_centers[:-1] + bin_centers[1:]) / 2
+    edges_centers[0]  = bin_centers[0] - (bin_centers[1] - bin_centers[0])/2
+    edges_centers[-1] = bin_centers[-1] + (bin_centers[-1] - bin_centers[-2])/2
+
+df_centers["bin_num"] = np.digitize(df_centers["bc_xbj"], edges_centers) - 1
 
 print(f"\nXSEC Model at Bin Centers")
 print(df_centers)
-
-df_centers_bin = (df_centers.groupby(["bin_num", "ebeam"], as_index=False)[["xsec_model_num", "xsec_model_denom", "bc_xbj", "bc_q2"]].mean())
 
 df_data["bc_xsec_model_num"] = np.nan
 df_data["bc_xsec_model_denom"] = np.nan
 df_data["bc_xbj"] = np.nan
 df_data["bc_q2"] = np.nan
+df_data["bc_eprime"] = np.nan
+df_data["bc_theta"] = np.nan
 
 for _, row in df_centers_bin.iterrows():
     mask = (df_data["ebeam"] == row["ebeam"]) & (df_data["bin_num"] == row["bin_num"])
-    df_data.loc[mask, "bc_xsec_model_num"] = row["xsec_model_num"]
-    df_data.loc[mask, "bc_xsec_model_denom"] = row["xsec_model_denom"]
+    df_data.loc[mask, "bc_xsec_model_num"] = row["bc_xsec_model_num"]
+    df_data.loc[mask, "bc_xsec_model_denom"] = row["bc_xsec_model_denom"]
     df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
     df_data.loc[mask, "bc_q2"] = row["bc_q2"]
+    df_data.loc[mask, "bc_eprime"] = row["bc_eprime"]
+    df_data.loc[mask, "bc_theta"] = row["bc_theta"]
 
 df_data["bc_corr"] = ((df_data["bc_xsec_model_num"] / df_data["bc_xsec_model_denom"]) /(df_data["xsec_model_num"] / df_data["xsec_model_denom"]))
 
@@ -373,7 +398,7 @@ R_ld2 = 0.2562
 
 df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 
-df_data["bc_nu"] = (1 / (2 * m_p) ) * df_data["bc_q2"] / df_data["bc_xbj"]
+df_data["bc_nu"] = df_data["ebeam"] - df_data["bc_eprime"]
 
 df_data["bc_epsilon"] = (1 + 2 * ( 1 + (df_data["bc_nu"]**2 / df_data["bc_q2"])) * np.tan(df_data["theta_rad"]/2)**2)**(-1)
 

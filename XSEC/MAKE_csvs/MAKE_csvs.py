@@ -18,7 +18,7 @@ from INIT.config import get_common_run_inputs, get_data_cuts
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-USING_DELTA_CORR = False
+USING_DELTA_CORR = True
 
 selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
 
@@ -270,37 +270,34 @@ for var, bins in custom_bins.items():
 
         if "weight" in df_mc_cut.columns:
             delta_temp = df_mc_cut["hsdelta"].values
+            deltacorr = 1.0
 
             if selected_target_shortname in {"c", "cu"}:
-                a = 1.007701e+00
-                b = 3.196105e-03
-                c = -3.538785e-04
-                d = -6.419247e-05
+                # Determined only with carbon,
+                a = 1.012441e+00
+                b = 3.055522e-03
+                c = -1.111970e-03
+                d = -6.311775e-05
+                e = 1.411932e-05
+
+                # Determined with carbon & copper
+                # a = 1.011460e+00
+                # b = 3.693367e-03
+                # c = -1.053783e-03
+                # d = -8.972322e-05
+                # e = 1.372362e-05
+
+
+                deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
 
             elif selected_target_shortname in {"ld2", "lh2"}:
-                a = 1.005920e+00
-                b = 5.115397e-03
-                c = -2.658848e-04
-                d = -9.315731e-05
+                a = 1.011192e+00
+                b = 5.168480e-03
+                c = -1.104189e-03
+                d = -9.446273e-05
+                e = 1.550629e-05
 
-
-            # Pass0p1 fit, using all targets
-            # a = 1.010971e+00
-            # b = 3.745011e-03
-            # c = -9.858059e-04
-            # d = -4.443637e-05
-            # e = 1.259198e-05
-            # f = -5.060609e-07
-
-            # Pass0p1 fit, ommitting Cu
-            # a = 1.011366e+00
-            # b = 3.834919e-03
-            # c = -1.038554e-03
-            # d = -4.585118e-05
-            # e = 1.350843e-05
-            # f = -4.958934e-07
-
-            deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3) # + e * delta_temp**4 + f * delta_temp**5)
+                deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
 
             if USING_DELTA_CORR:
                 event_weights = df_mc_cut["weight"].values * normfac * deltacorr

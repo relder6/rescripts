@@ -21,9 +21,9 @@ beam_passes = {"4pass", "5pass"}
 
 # targets = {"C", "Cu", "LD2", "LH2"}
 
-# targets = {"LD2", "LH2"}
-
 targets = {"C"}
+
+# targets = {"LH2", "LD2"}
 
 # -----------------------------------------------------
 # Reading in and compiling the csv; p0 fit to offset and overlay
@@ -52,13 +52,13 @@ for beam_pass in beam_passes:
         sigma = df["ratio_err"].values
 
         mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(sigma) & (sigma > 0)
-        x_fit = x[mask]
-        y_fit = y[mask]
+        x_data = x[mask]
+        y_data = y[mask]
         
         sigma_fit = sigma[mask]
 
         try:
-            popt, pcov = curve_fit(poly0_fit, x_fit, y_fit, sigma=sigma_fit, absolute_sigma = True)
+            popt, pcov = curve_fit(poly0_fit, x_data, y_data, sigma=sigma_fit, absolute_sigma = True)
             p0_fit = popt[0]
             p0_err = np.sqrt(np.diag(pcov))[0]
         except Exception as e:
@@ -100,21 +100,21 @@ y = df_all["ratio_offset"].values
 sigma = df_all["ratio_offset_err"].values
 
 mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(sigma) & (sigma > 0)
-x_fit = x[mask]
-y_fit = y[mask]
+x_data = x[mask]
+y_data = y[mask]
 sigma_fit = sigma[mask]
 
 dx = 1.0 # step in delta
 
 for order in orders:
-    s = np.array([np.sum(x_fit**k * dx) for k in range(order+1)])
-    total_integral = np.sum(y_fit * dx)
+    s = np.array([np.sum(x_data**k * dx) for k in range(order+1)])
+    total_integral = np.sum(y_data * dx)
 
     def polyN_fit_constr(x, *coeffs):
         a = (total_integral - np.sum([c * s[k+1] for k, c in enumerate(coeffs)])) / s[0]
         return a + sum(c * x**(k+1) for k, c in enumerate(coeffs))
 
-    if len(x_fit) == 0:
+    if len(x_data) == 0:
         raise RuntimeError("No valid data points after mask.")
     if order < 1:
         raise RuntimeError("Polynomial order must be at least 1.")
@@ -126,7 +126,7 @@ for order in orders:
     pN_err   = np.full(order+1, np.nan)
 
     try:
-        popt_free, pcov = curve_fit(polyN_fit_constr, x_fit, y_fit, p0=p0, sigma=sigma_fit, absolute_sigma = True)
+        popt_free, pcov = curve_fit(polyN_fit_constr, x_data, y_data, p0=p0, sigma=sigma_fit, absolute_sigma = True)
         popt[0] = (total_integral - np.sum([p * s[k+1] for k, p in enumerate(popt_free)])) / s[0]
         popt[1:] = popt_free
         pN_err = np.sqrt(np.diag(pcov))
@@ -134,12 +134,12 @@ for order in orders:
     except Exception as e:
         print(f"Fit failed for {csv_file}: {e}")
 
-    y_model = polyN_fit_constr(x_fit, *popt_free)
-    chi2 = np.sum(((y_fit - y_model)/sigma_fit)**2)
-    ndf = len(x_fit) - len(popt_free)
+    y_model = polyN_fit_constr(x_data, *popt_free)
+    chi2 = np.sum(((y_data - y_model)/sigma_fit)**2)
+    ndf = len(x_data) - len(popt_free)
     chi2_ndf = chi2 / ndf
 
-    x_smooth = np.linspace(np.min(x_fit), np.max(x_fit), 200)
+    x_smooth = np.linspace(np.min(x_data), np.max(x_data), 200)
     y_smooth = polyN_fit_constr(x_smooth, *popt_free)
 
     coeff_names = ["a"] + [chr(ord("b")+i) for i in range(order)]
@@ -153,13 +153,13 @@ for order in orders:
 
     print(f"{coeff_text}")
 
-    integral_model = np.sum(polyN_fit_constr(x_fit, *popt_free) * dx)
+    integral_model = np.sum(polyN_fit_constr(x_data, *popt_free) * dx)
 
     print("int data =", total_integral, "int model =", integral_model, "int_model/int_data =", integral_model / total_integral)
 
     print("")
 
-    plt.figure(figsize=(10, 6))
+    fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize = (8.5, 11/2), gridspec_kw = {"height_ratios":[2,1]}, sharex = True)
 
     target_colors = {"C": "blue", "LD2": "green", "Cu": "red", "LH2": "orange"}
     
@@ -176,45 +176,50 @@ for order in orders:
             y = df_plot["ratio_offset"].to_numpy()
             yerr = df_plot["ratio_offset_err"].to_numpy()
         
-            plt.errorbar(x, y, yerr=yerr,fmt=beam_markers[beam],color=target_colors[target],label=f"{target} {beam}",alpha=0.7)
+            ax_top.errorbar(x, y, yerr=yerr,fmt=beam_markers[beam],color=target_colors[target],label=f"{target} {beam}",alpha=0.7)
 
-    plt.plot(x_smooth, y_smooth, "r--", label=f"p{order} fit", linewidth=2)
+    ax_top.plot(x_smooth, y_smooth, "r--", label=f"p{order} fit", linewidth=2)
         
-    plt.text(0.05, 0.95, coeff_text,transform=plt.gca().transAxes,fontsize=10,verticalalignment='top',bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8))
+    ax_top.text(0.05, 0.95, coeff_text,transform=ax_top.transAxes,fontsize=10,verticalalignment='top',bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8))
+    
+    ax_top.set_ylabel("Data/MC Ratio", fontsize=14)
+    ax_top.set_title(f"Delta Correction Studies: p{order} Fit", fontsize=16)
+    ax_top.set_xlim(-8.0, 8.0)
+    ax_top.legend()
+    ax_top.grid(True)
 
-    plt.xlabel("Delta", fontsize=14)
-    plt.ylabel("Data/MC Ratio", fontsize=14)
-    plt.title(f"Delta Correction Studies: p{order} Fit", fontsize=16)
-    # plt.title("DATA/MC Ratio Comparison After Delta Correction", fontsize=16)
-    plt.xlim(-8.0, 8.0)
-    plt.ylim(0.912, 1.068)
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
+    # residuals = (y_data - y_model) / y_model
+    # residual_err = sigma_fit / y_model
 
-    residuals = (y_fit - y_model) / y_model
-    residual_err = sigma_fit / y_model
+    pulls = (y_data - y_model) / sigma_fit
+    pull_err = np.ones_like(pulls)
 
-    def p0_resid(x, c):
+    pull_mean = np.mean(pulls)
+    pull_rms  = np.std(pulls, ddof=1)
+
+    stats_text = f"Mean = {pull_mean:.3f}\nRMS = {pull_rms:.3f}"
+    ax_bot.text(0.05, 0.95, stats_text, transform=ax_bot.transAxes, fontsize=10, verticalalignment='top',bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8))
+    
+    def p0_pull(x, c):
         return c
 
     try:
-        popt_r, pcov_r = curve_fit(p0_resid,x_fit,residuals,sigma=residual_err,absolute_sigma=True)
+        popt_r, pcov_r = curve_fit(p0_pull,x_data,pulls,sigma = pull_err,absolute_sigma=True)
         c_fit = popt_r[0]
         c_err = np.sqrt(np.diag(pcov_r))[0]
     except Exception as e:
         print("Residual fit failed:", e)
         c_fit, c_err = np.nan, np.nan
 
-    plt.figure(figsize=(10,4))
-    x_line = np.linspace(np.min(x_fit), np.max(x_fit), 100)
-    plt.plot(x_line, np.full_like(x_line, c_fit), 'r--',
-             label=f"p0 fit: {c_fit:.3f} ± {c_err:.3f}")
-    plt.errorbar(x_fit, residuals, yerr=residual_err, fmt = "o", color = "navy", alpha=0.7)
-    plt.xlabel("Delta")
-    plt.ylabel("Residuals")
-    plt.title(f"Residuals vs Delta (p{order})")
-    plt.grid(True)
-    plt.legend()
+    x_line = np.linspace(np.min(x_data), np.max(x_data), 100)
+    ax_bot.plot(x_line, np.full_like(x_line, c_fit), 'r--', linewidth = 2, label=f"p0 fit: {c_fit:.3f} ± {c_err:.3f}")
+    ax_bot.errorbar(x_data, pulls, yerr=pull_err, fmt = "o", color = "navy", alpha=0.7)
+    ax_bot.set_xlabel("Delta", fontsize = 14)
+    ax_bot.set_ylabel(r"$\frac{y_{data}-y_{model}}{\sigma_{data}}$", fontsize = 14)
+    ax_bot.set_title(f"Pull Distribution in Delta: p{order} Fit")
+    ax_bot.grid(True)
+    # ax_bot.legend()
+
+    fig.tight_layout()
 
 plt.show()
