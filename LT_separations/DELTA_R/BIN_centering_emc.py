@@ -12,84 +12,26 @@ import subprocess
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
+from INIT.config import get_data_cuts, get_common_values
 from INIT.slac_emc_fit import slac_emc_fit
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
 # -----------------------------------------------------
-if len(sys.argv) == 6:
-    selected_run_type = sys.argv[1].strip().lower()
-    selected_beam_pass = sys.argv[2].strip()
-    selected_num = sys.argv[3].strip().lower()
-    selected_denom = sys.argv[4].strip().lower()
-    nbins = int(sys.argv[5])
-else:
-    selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-    if not selected_run_type:
-        selected_run_type = "hmsdis"
-    selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-    selected_num = input("Enter numerator target: ").strip().lower()
-    selected_denom = input("Enter denominator target: ").strip().lower()
-    nbins = int(input("Enter bin number: "))
-    
-selected_beam_pass_to_energy_prefix = {
-    "1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."
-}
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
-selected_target_shortcut_to_target_variable = {
-    "al":"al","al13":"al","aluminum":"al",
-    "c":"c","c12":"c","carbon":"c",
-    "cu":"cu","cu29":"cu","copper":"cu",
-    "opt1":"optics1","optics1":"optics1",
-    "opt2":"optics2","optics2":"optics2",
-    "d2":"ld2","ld2":"ld2",
-    "h2":"lh2","lh2":"lh2",
-    "hole":"hole","chole":"hole","c-hole":"hole",
-    "dummy":"dummy","dum":"dummy"
-}
+selected_run_type = parse_run_type(arg1)
+num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg2)
+denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg3)
+nbins = parse_bins(arg4)
 
-selected_target_shortname_to_title_longname = {
-    "al":"Aluminum",
-    "c":"Carbon",
-    "cu":"Copper",
-    "opt1":"Optics1",
-    "opt2":"Optics2",
-    "ld2":"Deuterium",
-    "lh2":"Hydrogen",
-    "hole":"Carbon Hole",
-    "dummy":"Dummy"}
-
-# Targets
-num_short = selected_target_shortcut_to_target_variable.get(selected_num)
-if not num_short:
-    print(f"Unknown target: {selected_num}. Please try again.")
-    exit(1)
-num_long = selected_target_shortname_to_title_longname[num_short]
-    
-denom_short = selected_target_shortcut_to_target_variable.get(selected_denom)
-if not denom_short:
-    print(f"Unknown target: {selected_denom}. Please try again.")
-    exit(1)
-denom_long = selected_target_shortname_to_title_longname[denom_short]
-
-selected_target_shortname_to_AZ = {"al":   (27, 13),
-                                   "c":    (12, 6),
-                                   "cu":   (64, 29),
-                                   "ld2":  (2, 1),
-                                   "lh2":  (1, 1)}
-
-A_num, Z_num = selected_target_shortname_to_AZ.get(num_short)
-
-N_num = A_num - Z_num
-
-A_denom, Z_denom = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
-
-A_ratio = A_num / A_denom
+A_ratio = num_A / denom_A
+num_N = num_A - num_Z
+denom_N = denom_A - denom_Z
 
 vals = get_common_values()
 ebeam_4pass = vals["ebeam_4pass"]
@@ -107,7 +49,7 @@ beam_passes = ["4pass", "5pass"]
 csv_files = []
 
 for beam_pass in beam_passes:
-    csv_files.append(f"{xsec_ratio_dir}/XSEC_RATIO_{selected_run_type}_{beam_pass}_{num_short}_to_{denom_short}.csv")
+    csv_files.append(f"{xsec_ratio_dir}/XSEC_RATIO_{selected_run_type}_{beam_pass}_{num_abbrev}_to_{denom_abbrev}.csv")
 
 all_rows = []
 
@@ -148,7 +90,7 @@ for filepath in csv_files:
 
 df_data = pd.concat(all_rows, ignore_index=True)
 
-output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_short}_to_{denom_short}.csv"
+output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_abbrev}_to_{denom_abbrev}.csv"
 
 # -----------------------------------------------------
 # Determining the bin centers
@@ -338,12 +280,12 @@ for i in range(1, len(edges)-1):
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{num_long}/{denom_long} Binning Test (nbins={nbins})")
+plt.title(f"{num_longname}/{denom_longname} Binning Test (nbins={nbins})")
 
 plt.legend()
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
-plt.savefig(f"PNGs/{selected_run_type}_{num_short}_to_{denom_short}_binning_test.png")
+plt.savefig(f"PNGs/{selected_run_type}_{num_abbrev}_to_{denom_abbrev}_binning_test.png")
 
 # plt.show()
 

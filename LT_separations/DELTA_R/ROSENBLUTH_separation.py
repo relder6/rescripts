@@ -9,7 +9,7 @@ import os, re, sys, csv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
+from INIT.config import get_data_cuts, get_common_values
 from scipy.optimize import curve_fit
 from collections import defaultdict
 from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
