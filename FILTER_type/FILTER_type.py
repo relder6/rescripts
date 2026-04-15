@@ -6,27 +6,29 @@ import numpy as np
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import get_common_run_inputs
+from INIT.config import parse_run_type, parse_beam_pass, parse_target
 
 # -----------------------------------------------------
-# Establishing paths
+# Handling user inputs
 # -----------------------------------------------------
-bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
-
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
                 #Now skipping the low current (< 10 uA) runs,
-                # 23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
-                # 24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
-                # 24498,24563,24911,24967,25047,25081,25406,25407,25416,25417,
+                23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
+                24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
+                24498,24563,24911,24967,25047,25081,25406,25407,25416,25417,
                 #Now skipping some runs that have negative yields (?!),
                 25396, 25397]
 
-# -----------------------------------------------------
-# Input handling
-# -----------------------------------------------------
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
 
-output_filepath = f"{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
+selected_run_type = parse_run_type(arg1)
+selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
+target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
+
+bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
+output_filepath = f"{target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_runs.dat"
 
 # -----------------------------------------------------
 # Bigtable look-up
@@ -58,14 +60,14 @@ if os.path.exists(bigtable_filepath):
                 stop_time = row.get("stop_time", "N/A")
 
                 # Being sure to only read out the boil_corr for liquid targets,
-                if selected_target_shortname in ["lh2", "ld2"]:
+                if target_shortname in ["lh2", "ld2"]:
                     boil_corr = row.get("boil_corr", "N/A")
                 else:
                     boil_corr = 1.0
 
                 # Calculating extra values (like weights) that downstream scripts expect,
                 if (selected_run_type == run_type.strip().lower() and
-                    selected_target_shortname.lower() == target.strip().lower() and
+                    target_shortname.lower() == target.strip().lower() and
                     ebeam.startswith(beam_prefix) and
                     runnum not in skip_runnums):
 
@@ -91,7 +93,7 @@ if os.path.exists(bigtable_filepath):
 
                     current_offset_corr = 1
 
-                    # if selected_target_shortname == "cu":
+                    # if target_shortname == "cu":
                     #     current_offset_corr = 1 / (1 + (0.279928 / float(ibeam) ))
 
                     weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
@@ -143,7 +145,7 @@ if bigtable_lookup:
         for runnum, data in bigtable_lookup.items():
 
             if (selected_run_type == data["run_type"].strip().lower() and
-                selected_target_shortname.lower() == data["target"].strip().lower() and
+                target_shortname.lower() == data["target"].strip().lower() and
                 data["ebeam"].startswith(beam_prefix) and
                 runnum not in skip_runnums):
             
@@ -153,4 +155,4 @@ if bigtable_lookup:
     print(f"\n☢️  Saved {rows_written} matching lines to {output_filepath}")
 
 else:
-    print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{selected_target_shortname}'. No file was written.")
+    print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{target_shortname}'. No file was written.")

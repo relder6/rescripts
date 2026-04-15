@@ -2,7 +2,7 @@
 
 run_types=(hmsdis)
 beam_passes=(4 5)
-targets=(c cu ld2 lh2)
+targets=(al c cu ld2 lh2)
 
 script_path="./FORM_xsec.py"
 
@@ -18,7 +18,7 @@ for run_type in "${run_types[@]}"; do
 done
 
 script_path_ratio="./FORM_ratios.py"
-numerators=(c cu)
+numerators=(al c cu)
 denominators=(ld2 lh2)
 
 for run_type in "${run_types[@]}"; do

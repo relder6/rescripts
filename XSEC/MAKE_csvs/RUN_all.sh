@@ -2,7 +2,7 @@
 
 run_types=(hmsdis)
 beam_passes=(4 5)
-targets=(c cu ld2 lh2 dummy)
+targets=(al c cu ld2 lh2 dummy)
 
 script_path="./MAKE_csvs.py"
 

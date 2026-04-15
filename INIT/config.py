@@ -22,67 +22,119 @@ def get_common_values():
 # User Input Processing Logic
 # =====================================================================
 
-def get_common_run_inputs():
-    if len(sys.argv) == 4:
-        selected_run_type = sys.argv[1].strip().lower()
-        selected_beam_pass = sys.argv[2].strip()
-        selected_target = sys.argv[3].strip().lower()
-    else:
-        selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-        if not selected_run_type:
-            selected_run_type = f"hmsdis"
-        selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-        selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
+# def get_common_run_inputs():
+#     if len(sys.argv) == 4:
+#         selected_run_type = sys.argv[1].strip().lower()
+#         selected_beam_pass = sys.argv[2].strip()
+#         selected_target = sys.argv[3].strip().lower()
+#     else:
+#         selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
+#         if not selected_run_type:
+#             selected_run_type = f"hmsdis"
+#         selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
+#         selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ").strip().lower()
 
 
-    selected_beam_pass_to_energy_prefix = {"1": "2.","2": "4.","3": "6.","4": "8.","5": "10."}
+#     selected_beam_pass_to_energy_prefix = {"1": "2.","2": "4.","3": "6.","4": "8.","5": "10."}
 
-    beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
+#     beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
 
-    if not beam_prefix:
-        print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-        exit(1)
+#     if not beam_prefix:
+#         print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
+#         exit(1)
 
-    selected_target_shortcut_to_target_variable = {"al":"al","al13":"al","aluminum":"al",
-                                                   "c":"c","c12":"c","carbon":"c",
-                                                   "cu":"cu","cu29":"cu","copper":"cu",
-                                                   "opt1":"optics1","optics1":"optics1",
-                                                   "opt2":"optics2","optics2":"optics2",
-                                                   "d2":"ld2","ld2":"ld2",
-                                                   "h2":"lh2","lh2":"lh2",
-                                                   "hole":"hole","chole":"hole","c-hole":"hole",
-                                                   "dummy":"dummy","dum":"dummy",
-                                                   }
+#     selected_target_shortcut_to_target_variable = {"al":"al","al13":"al","aluminum":"al",
+#                                                    "c":"c","c12":"c","carbon":"c",
+#                                                    "cu":"cu","cu29":"cu","copper":"cu",
+#                                                    "opt1":"optics1","optics1":"optics1",
+#                                                    "opt2":"optics2","optics2":"optics2",
+#                                                    "d2":"ld2","ld2":"ld2",
+#                                                    "h2":"lh2","lh2":"lh2",
+#                                                    "hole":"hole","chole":"hole","c-hole":"hole",
+#                                                    "dummy":"dummy","dum":"dummy",
+#                                                    }
 
-    selected_target_shortname = selected_target_shortcut_to_target_variable.get(selected_target)
+#     selected_target_shortname = selected_target_shortcut_to_target_variable.get(selected_target)
 
-    if not selected_target_shortname:
-        print(f"Unknown target: {selected_target}.  Please try again.")
-        exit(1)
+#     if not selected_target_shortname:
+#         print(f"Unknown target: {selected_target}.  Please try again.")
+#         exit(1)
 
-    selected_target_shortname_to_title_longname = {
-        "al":"Aluminum",
-        "c":"Carbon",
-        "cu":"Copper",
-        "opt1":"Optics1",
-        "opt2":"Optics2",
-        "ld2":"Deuterium",
-        "lh2":"Hydrogen",
-        "hole":"Carbon Hole",
-        "dummy":"Dummy"}
+#     selected_target_shortname_to_title_longname = {
+#         "al":"Aluminum",
+#         "c":"Carbon",
+#         "cu":"Copper",
+#         "opt1":"Optics1",
+#         "opt2":"Optics2",
+#         "ld2":"Deuterium",
+#         "lh2":"Hydrogen",
+#         "hole":"Carbon Hole",
+#         "dummy":"Dummy"}
 
-    selected_target_titlename = selected_target_shortname_to_title_longname.get(selected_target_shortname)
+#     selected_target_titlename = selected_target_shortname_to_title_longname.get(selected_target_shortname)
 
-    selected_target_shortname_to_AZ = {"al":   (27, 13),
-                                       "c":    (12, 6),
-                                       "cu":   (64, 29),
-                                       "ld2":  (2,  1),
-                                       "lh2":  (1,  1),
-                                       "dummy": (0, 0)}
+#     selected_target_shortname_to_AZ = {"al":   (27, 13),
+#                                        "c":    (12, 6),
+#                                        "cu":   (64, 29),
+#                                        "ld2":  (2,  1),
+#                                        "lh2":  (1,  1),
+#                                        "dummy": (0, 0)}
     
-    selected_target_A, selected_target_Z = selected_target_shortname_to_AZ.get(selected_target_shortname)
+#     selected_target_A, selected_target_Z = selected_target_shortname_to_AZ.get(selected_target_shortname)
 
-    return selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z
+#     return selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z
+
+# ---------------------------------------------------------------------
+# User Input Processing Logic
+# ---------------------------------------------------------------------
+def parse_bins(nbins):
+    if nbins is None or nbins.strip() == "":
+        nbins = input("Indicate number of desired bins: ")
+    nbins = int(nbins.strip())
+    if not nbins:
+        raise ValueError(f"Cannot evaluate number of bins: {nbins}")
+    return nbins
+
+def parse_run_type(selected_run_type):
+    if selected_run_type is None or selected_run_type.strip() == "":
+        selected_run_type = input("Enter desired run type (default HMSDIS): ").strip()
+    selected_run_type = str(selected_run_type).strip().lower()
+    if not selected_run_type:
+        selected_run_type = "hmsdis"
+    return selected_run_type
+
+def parse_beam_pass(selected_beam_pass):
+    selected_beam_pass_to_energy_prefix = {"1": "2.","2": "4.","3": "6.","4": "8.","5": "10."}
+    if selected_beam_pass is None or selected_beam_pass.strip() == "":
+        selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ")
+    beam_prefix = selected_beam_pass_to_energy_prefix.get(str(selected_beam_pass).strip())
+    if not beam_prefix:
+        raise ValueError(f"Unknown pass: {selected_beam_pass}")
+    return str(selected_beam_pass).strip(), beam_prefix
+
+
+def parse_target(selected_target):
+    if selected_target is None or selected_target.strip() == "":
+        selected_target = input("Enter desired target (options: C, Cu, Al, LD2, LH2, Dummy): ")
+    selected_target = str(selected_target).strip().lower()
+    selected_target_shortcut_to_target_variable = {"al": "al", "aluminum": "al",
+                                                   "c": "c", "carbon": "c",
+                                                   "cu": "cu", "copper": "cu",
+                                                   "ld2": "ld2", "d2": "ld2", "deuterium": "ld2",
+                                                   "lh2": "lh2", "h2": "lh2", "hydrogen": "lh2",
+                                                   "dummy": "dummy"}
+    target_abbrev = selected_target_shortcut_to_target_variable.get(selected_target)
+    if not target_abbrev:
+        raise ValueError(f"Unknown target: {selected_target}")
+
+    target_info = {"al": ("Aluminum", "Al", 27, 13),
+                   "c": ("Carbon", "C", 12, 6),
+                   "cu": ("Copper", "Cu", 64, 29),
+                   "ld2": ("Deuterium", "LD2", 2, 1),
+                   "lh2": ("Hydrogen", "LH2", 1, 1),
+                   "dummy": ("Dummy", "Dummy", 0, 0)}
+    target_longname, target_shortname, target_A, target_Z = target_info[target_abbrev]
+    return target_abbrev, target_longname, target_shortname, target_A, target_Z
 
 # def input_processing():
     

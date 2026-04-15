@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 # -----------------------------------------------------
 # Input Settings and Such
 # -----------------------------------------------------
-orders = [3, 4, 5, 6]
+# orders = [3, 4, 5, 6]
+orders = [4]
 
 ratio_directory = "../XSEC/DATA_to_MC"
 
@@ -21,9 +22,9 @@ beam_passes = {"4pass", "5pass"}
 
 # targets = {"C", "Cu", "LD2", "LH2"}
 
-targets = {"C"}
+# targets = {"C"}
 
-# targets = {"LH2", "LD2"}
+targets = {"LH2", "LD2"}
 
 # -----------------------------------------------------
 # Reading in and compiling the csv; p0 fit to offset and overlay

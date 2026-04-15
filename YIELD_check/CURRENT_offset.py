@@ -10,7 +10,7 @@ import matplotlib.colors as mplcolors
 from scipy.optimize import curve_fit
 
 # Input file
-csvfile = "CSVs/yield_check_hmsdis_4pass_cu.csv"
+csvfile = "CSVs/yield_check_hmsdis_4pass_c.csv"
 
 data = np.genfromtxt(csvfile,delimiter=",",names=True,dtype=None,encoding=None)
 
@@ -18,13 +18,15 @@ polarity_mask = data["polarity"] == "-"
 
 # runnum_mask = np.isin(data["runnum"], [24303, 24304, 24306, 24307, 24308])
 
-runnum_mask = ~np.isin(data["runnum"], [0, 1])
+runnum_mask = np.isin(data["runnum"], [24301, 24302, 24303, 24304, 24305, 24306, 24307, 24308, 24309])
 
-targ_mask = np.isin(data["target"], ["cu", "c", "lh2"])
+# runnum_mask = ~np.isin(data["runnum"], [0])
+
+targ_mask = np.isin(data["target"], ["cu", "c", "lh2", "ld2"])
 
 pass_mask = np.isin(data["beampass"], ["4Pass", "5Pass"])
 
-current_mask = (data["current"] > 5) & (data["current"] < 45)
+current_mask = (data["current"] > 0) & (data["current"] < 45)
 
 mask = polarity_mask & runnum_mask & current_mask & targ_mask & pass_mask
 

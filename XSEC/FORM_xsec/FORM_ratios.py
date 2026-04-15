@@ -11,88 +11,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.jra_nprat import jra_nprat
-
+from INIT.config import parse_run_type, parse_beam_pass, parse_target
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-if len(sys.argv) == 5:
-    selected_run_type = sys.argv[1].strip().lower()
-    selected_beam_pass = sys.argv[2].strip()
-    selected_num = sys.argv[3].strip().lower()
-    selected_denom = sys.argv[4].strip().lower()
-else:
-    selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-    if not selected_run_type:
-        selected_run_type = "hmsdis"
-    selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-    selected_num = input("Enter numerator target: ").strip().lower()
-    selected_denom = input("Enter denominator target: ").strip().lower()
-    
-selected_beam_pass_to_energy_prefix = {
-    "1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."
-}
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
-selected_target_shortcut_to_target_variable = {
-    "al":"al","al13":"al","aluminum":"al",
-    "c":"c","c12":"c","carbon":"c",
-    "cu":"cu","cu29":"cu","copper":"cu",
-    "opt1":"optics1","optics1":"optics1",
-    "opt2":"optics2","optics2":"optics2",
-    "d2":"ld2","ld2":"ld2",
-    "h2":"lh2","lh2":"lh2",
-    "hole":"hole","chole":"hole","c-hole":"hole",
-    "dummy":"dummy","dum":"dummy"
-}
+selected_run_type = parse_run_type(arg1)
+selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
+num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg3)
+denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg4)
 
-selected_target_shortname_to_title_longname = {
-    "al":"Aluminum",
-    "c":"Carbon",
-    "cu":"Copper",
-    "opt1":"Optics1",
-    "opt2":"Optics2",
-    "ld2":"Deuterium",
-    "lh2":"Hydrogen",
-    "hole":"Carbon Hole",
-    "dummy":"Dummy"}
-
-# Targets
-num_short = selected_target_shortcut_to_target_variable.get(selected_num)
-if not num_short:
-    print(f"Unknown target: {selected_num}. Please try again.")
-    exit(1)
-num_long = selected_target_shortname_to_title_longname[num_short]
-    
-denom_short = selected_target_shortcut_to_target_variable.get(selected_denom)
-if not denom_short:
-    print(f"Unknown target: {selected_denom}. Please try again.")
-    exit(1)
-denom_long = selected_target_shortname_to_title_longname[denom_short]
-
-selected_target_shortname_to_AZ = {"al":   (27, 13),
-                                   "c":    (12, 6),
-                                   "cu":   (64, 29),
-                                   "ld2":  (2, 1),
-                                   "lh2":  (1, 1)}
-
-A_num, Z_num = selected_target_shortname_to_AZ.get(num_short)
-
-N_num = A_num - Z_num
-
-A_denom, Z_denom = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
-
-A_ratio = A_num / A_denom
+A_ratio = num_A / denom_A
+num_N = num_A - num_Z
+denom_N = denom_A - denom_Z
 
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-num_csv_filepath = f"{num_short.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{num_short}.csv"
+num_csv_filepath = f"{num_abbrev.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{num_abbrev}.csv"
 
-denom_csv_filepath = f"{denom_short.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{denom_short}.csv"
+denom_csv_filepath = f"{denom_abbrev.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{denom_abbrev}.csv"
 
 # -----------------------------------------------------
 # Preparing Dataframes
@@ -129,7 +72,7 @@ f2rat = np.array([jra_nprat(x, q) for x, q in zip(df_merged["xbj"], df_merged["q
 
 df_merged["f2rat"] = f2rat
 
-df_merged["iso_corr"] = (0.5*(Z_num + N_num) * (1.0 + df_merged["f2rat"]) / (Z_num + N_num * df_merged["f2rat"]))
+df_merged["iso_corr"] = (0.5*(num_Z + num_N) * (1.0 + df_merged["f2rat"]) / (num_Z + num_N * df_merged["f2rat"]))
 
 df_merged["xsec_ratio_final"] = df_merged["xsec_ratio_norm"] * df_merged["iso_corr"]
 # df_merged["xsec_ratio_final"] = df_merged["xsec_ratio_norm"]
@@ -142,7 +85,7 @@ df_merged["xsec_ratio_final_err"] = df_merged["xsec_ratio_norm_err"] * df_merged
 output_dir = "RATIOS"
 os.makedirs(output_dir, exist_ok=True)
 
-output_csv_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_short}_to_{denom_short}.csv"
+output_csv_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_abbrev}_to_{denom_abbrev}.csv"
 
 df_merged.to_csv(output_csv_filepath, index=False)
 
@@ -151,7 +94,7 @@ print(f"Saved → {output_csv_filepath}")
 # -----------------------------------------------------
 # Plotting
 # -----------------------------------------------------
-output_pdf_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_short}_to_{denom_short}.pdf"
+output_pdf_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_abbrev}_to_{denom_abbrev}.pdf"
 
 vars_to_plot = {
     "eprime": df_merged["eprime"].to_numpy(),
@@ -173,7 +116,7 @@ for var, val in vars_to_plot.items():
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.set_xlabel(f"{var}")
     ax.set_ylabel("Cross Section Ratio per Nucleon")
-    ax.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {num_long}/{denom_long} Cross Section Ratio per Nucleon")
+    ax.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {num_shortname}/{denom_shortname} Cross Section Ratio per Nucleon")
     ax.grid()
 
     pp.savefig(fig)

@@ -12,82 +12,24 @@ if BASE_DIR not in sys.path:
 from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
 from scipy.optimize import curve_fit
 from collections import defaultdict
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-if len(sys.argv) == 6:
-    selected_run_type = sys.argv[1].strip().lower()
-    selected_beam_pass = sys.argv[2].strip()
-    selected_num = sys.argv[3].strip().lower()
-    selected_denom = sys.argv[4].strip().lower()
-    nbins = int(sys.argv[5])
-else:
-    selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-    if not selected_run_type:
-        selected_run_type = "hmsdis"
-    selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-    selected_num = input("Enter numerator target: ").strip().lower()
-    selected_denom = input("Enter denominator target: ").strip().lower()
-    nbins = int(input("Enter bin number: "))
-    
-selected_beam_pass_to_energy_prefix = {
-    "1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."
-}
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
+USING_SYST_ERR_EST = True
 
-selected_target_shortcut_to_target_variable = {
-    "al":"al","al13":"al","aluminum":"al",
-    "c":"c","c12":"c","carbon":"c",
-    "cu":"cu","cu29":"cu","copper":"cu",
-    "opt1":"optics1","optics1":"optics1",
-    "opt2":"optics2","optics2":"optics2",
-    "d2":"ld2","ld2":"ld2",
-    "h2":"lh2","lh2":"lh2",
-    "hole":"hole","chole":"hole","c-hole":"hole",
-    "dummy":"dummy","dum":"dummy"
-}
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
 
-selected_target_shortname_to_title_longname = {
-    "al":"Aluminum",
-    "c":"Carbon",
-    "cu":"Copper",
-    "opt1":"Optics1",
-    "opt2":"Optics2",
-    "ld2":"Deuterium",
-    "lh2":"Hydrogen",
-    "hole":"Carbon Hole",
-    "dummy":"Dummy"}
+selected_run_type = parse_run_type(arg1)
+num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg2)
+denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg3)
 
-# Targets
-num_short = selected_target_shortcut_to_target_variable.get(selected_num)
-if not num_short:
-    print(f"Unknown target: {selected_num}. Please try again.")
-    exit(1)
-num_long = selected_target_shortname_to_title_longname[num_short]
-    
-denom_short = selected_target_shortcut_to_target_variable.get(selected_denom)
-if not denom_short:
-    print(f"Unknown target: {selected_denom}. Please try again.")
-    exit(1)
-denom_long = selected_target_shortname_to_title_longname[denom_short]
-
-selected_target_shortname_to_AZ = {"al":   (27, 13),
-                                   "c":    (12, 6),
-                                   "cu":   (64, 29),
-                                   "ld2":  (2, 1),
-                                   "lh2":  (1, 1)}
-
-A_num, Z_num = selected_target_shortname_to_AZ.get(num_short)
-
-N_num = A_num - Z_num
-
-A_denom, Z_denom = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
-
-A_ratio = A_num / A_denom
+A_ratio = num_A / denom_A
+num_N = num_A - num_Z
+denom_N = denom_A - denom_Z
 
 vals = get_common_values()
 ebeam_4pass = vals["ebeam_4pass"]
@@ -102,10 +44,10 @@ xsec_ratio_dir = "../../XSEC/FORM_xsec/RATIOS"
 beam_passes = ["4pass", "5pass"]
 
 os.makedirs("CSVs", exist_ok=True)
-bc_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_short}_to_{denom_short}.csv"
+bc_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_abbrev}_to_{denom_abbrev}.csv"
 
 os.makedirs("PDFs", exist_ok=True)
-pdf_output = f"PDFs/DELTA_R_{selected_run_type.upper()}_rosenbluth_separation_{num_short}_to_{denom_short}.pdf"
+pdf_output = f"PDFs/DELTA_R_{selected_run_type.upper()}_rosenbluth_separation_{num_abbrev}_to_{denom_abbrev}.pdf"
 pp = PdfPages(pdf_output)
 
 # -----------------------------------------------------
@@ -141,8 +83,11 @@ for bin_num, sub in df.groupby("bin_num"):
                      "xbj": sub["xbj"].to_numpy(),
                      "q2": sub["q2"].to_numpy(),}
 
-def linear_fit(x, intercept, slope):
-    return intercept + slope * x
+# def linear_fit(x, intercept, slope):
+#     return intercept + slope * x
+
+def modified_linear_fit(x, sig_t_ratio, deltaR):
+    return sig_t_ratio * (1 + ( deltaR * x))
 
 fit_results = []
 epsp_rows = []
@@ -156,6 +101,14 @@ with PdfPages(pdf_output) as pp:
         epsp_raw = np.array(data[bin_num]["epsilon_p"])
         ratio_raw = np.array(data[bin_num]["xsec_ratio"])
         ratio_err_raw = np.array(data[bin_num]["xsec_ratio_err"])
+
+        if USING_SYST_ERR_EST:
+            syst_err = 0.010
+        else:
+            syst_err = 0
+            
+        ratio_err_bc = np.sqrt(ratio_err_bc**2 + (syst_err * ratio_bc)**2)
+        ratio_err_raw = np.sqrt(ratio_err_raw**2 + (syst_err * ratio_raw)**2)
 
         xbj_arr = np.array(bc_data[bin_num]["xbj"])
         q2_arr = np.array(bc_data[bin_num]["q2"])
@@ -188,10 +141,19 @@ with PdfPages(pdf_output) as pp:
         rat_comb = np.array(rat_comb)
         rat_err_comb = np.array(rat_err_comb)
 
-        popt, pcov = curve_fit(linear_fit, epsp_comb, rat_comb, sigma=rat_err_comb, absolute_sigma=True)
-        intercept, slope = popt
-        int_err = np.sqrt(pcov[0, 0])
-        slope_err = np.sqrt(pcov[1, 1])
+        popt, pcov = curve_fit(modified_linear_fit, epsp_comb, rat_comb, sigma=rat_err_comb, absolute_sigma=True)
+        sig_t_ratio, deltaR = popt
+        sig_t_ratio_err = np.sqrt(pcov[0, 0])
+        deltaR_err = np.sqrt(pcov[1, 1])
+
+        fit_results.append({"bin_num": bin_num,
+                            "xbj": xbjavg,
+                            "q2_avg": q2avg,
+                            "q2_err": q2_err,
+                            "delta_R": deltaR,
+                            "delta_R_err": deltaR_err,
+                            "sigma_t_ratio": sig_t_ratio,
+                            "sigma_t_ratio_err": sig_t_ratio_err})
 
         fig, ax = plt.subplots(figsize = (6, 5))
 
@@ -204,10 +166,9 @@ with PdfPages(pdf_output) as pp:
         epsp_min = min(epsp_raw.min(), epsp_bc.min(), epsp_comb.min())
         epsp_max = max(epsp_raw.max(), epsp_bc.max(), epsp_comb.max())
         x_fit = np.linspace(epsp_min, epsp_max, 200)
-        y_fit = linear_fit(x_fit, intercept, slope)
-        ax.plot(x_fit, y_fit, "--", color="red",label=("Linear fit\n"
-                                                       rf"$\Delta R = {slope:.4f} \pm {slope_err:.4f}$"))
-
+        y_fit = modified_linear_fit(x_fit, sig_t_ratio, deltaR)
+        ax.plot(x_fit, y_fit, "--", color="red",label=(r"Modified Linear Fit: $\frac{\sigma_A}{\sigma_D} = \frac{\sigma_A^T}{\sigma_D^T} \left(1 + \Delta R \epsilon' \right)$"f"\n"f"(includes est. {syst_err} syst. err.)"))
+        
         all_rat = np.concatenate([ratio_raw, ratio_bc, rat_comb])
                 
         y_min, y_max = all_rat.min(), all_rat.max()
@@ -217,7 +178,7 @@ with PdfPages(pdf_output) as pp:
         ax.set_xlim(epsp_min - 0.05, epsp_max + 0.05)
         ax.set_ylim(y_min - dy, y_max + dy)
 
-        ax.set_title(f"{num_long}/{denom_long} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {slope:.4f} ± {slope_err:.4f}", fontsize=10)
+        ax.set_title(f"{num_longname}/{denom_longname} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {deltaR:.4f} ± {deltaR_err:.4f},"f"\t"r"$\sigma_A^T \backslash \sigma_D^T =$"f"{sig_t_ratio:.4f}"r" $\pm$"f"{sig_t_ratio_err:.4f}", fontsize=10)
         ax.set_xlabel(r"$\epsilon$'")
         ax.set_ylabel(r"$ \sigma_A / \sigma_D$")
         
@@ -228,91 +189,6 @@ with PdfPages(pdf_output) as pp:
         plt.close(fig)
 
 print(f"PDF saved to {pdf_output}")
-csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_{num_short}_to_{denom_short}.csv"
+csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_{num_abbrev}_to_{denom_abbrev}.csv"
 pd.DataFrame(fit_results).to_csv(csv_output, index=False)
 print(f"CSV of fits saved to {csv_output}")
-            
-
-        
-                           
-
-#     for bin_num, data in bin_data.items():
-#         epsp = np.array(data["epsilon_p"])
-#         ratio = np.array(data["xsec_ratio"])
-#         ratio_err = np.array(data["xsec_ratio_err"])
-
-#         epsp_unique = {}
-#         for e, r, rerr in zip(epsp, ratio, ratio_err):
-#             if e not in epsp_unique:
-#                 epsp_unique[e] = {"ratio": [], "ratio_err": []}
-#             epsp_unique[e]["ratio"].append(r)
-#             epsp_unique[e]["ratio_err"].append(rerr)
-
-#         epsp = []
-#         ratio = []
-#         ratio_err = []
-
-#         for e, vals in epsp_unique.items():
-#             r = np.array(vals["ratio"])
-#             rerr = np.array(vals["ratio_err"])
-
-#             weights = 1 / rerr**2
-#             r_avg = np.sum(r * weights) / np.sum(weights)
-#             r_err = np.sqrt(1 / np.sum(weights))
-
-#             epsp.append(e)
-#             ratio.append(r_avg)
-#             ratio_err.append(r_err)
-
-#         epsp = np.array(epsp)
-#         ratio = np.array(ratio)
-#         ratio_err = np.array(ratio_err)
-
-#         xbjavg = np.mean(data["xbj"])
-#         n_points = len(data["q2"])
-#         q2avg = np.mean(data["q2"])
-#         q2max = np.max(data["q2"])
-#         q2min = np.min(data["q2"])
-#         q2_err = np.std(data["q2"], ddof=1) if n_points > 2 else (q2max - q2min)/2
-
-#         popt, pcov = curve_fit(linear_fit, epsp, ratio, sigma=ratio_err, absolute_sigma=True)
-#         intercept, slope = popt
-#         int_err = np.sqrt(pcov[0,0])
-#         slope_err = np.sqrt(pcov[1,1])
-#         R = float(slope) / float(intercept)
-#         R_err = np.sqrt((pcov[1,1] / intercept**2) + (slope**2 * pcov[0,0] / intercept**4) - (2 * slope * pcov[0,1] / intercept**3))
-
-#         print(f"bin {bin_num}: xbj = {xbjavg:.3f}, q2 = {q2avg:.3f} ± {q2_err:.3f}")
-#         print(f"σ_A - σ_T = {slope:.4f} ± {slope_err:.4f}")
-
-#         fit_results.append({"bin_num": bin_num,
-#                             "xbj": xbjavg,
-#                             "q2_avg": q2avg,
-#                             "q2_err": q2_err,
-#                             "delta_R": slope,
-#                             "delta_R_err": slope_err})
-        
-#         fig, ax = plt.subplots(figsize=(6, 5))
-        
-#         ax.errorbar(epsp, ratio, yerr=ratio_err, fmt="o", color="navy", markersize = 4)
-
-#         # Fit evaluated across full x-axis [0, 1]
-#         x_full = np.linspace(0.0, 1.0, 200)
-#         y_full = linear_fit(x_full, intercept, slope)
-#         ax.plot(x_full,y_full,"--",color="red",label=("Linear fit: y = mx + b\n"
-#                                                       rf"$\Delta R = {slope:.4f} \pm {slope_err:.4f}$"))
-
-#         ax.set_title(f"{num_long}/{denom_long} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {slope:.4f} ± {slope_err:.4f}", fontsize=10)
-#         ax.set_xlabel(r"$\epsilon$'")
-#         ax.set_ylabel(r"$ \sigma_A / \sigma_D$")
-#         ax.set_xlim(0, 1)
-#         ax.legend(fontsize=8)
-#         ax.grid(True)
-
-#         pp.savefig(fig)
-#         plt.close(fig)
-
-# print(f"PDF saved to {pdf_output}")
-# csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_{num_short}_to_{denom_short}.csv"
-# pd.DataFrame(fit_results).to_csv(csv_output, index=False)
-# print(f"CSV of fits saved to {csv_output}")

@@ -14,82 +14,24 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
 from INIT.slac_emc_fit import slac_emc_fit
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
 # -----------------------------------------------------
-if len(sys.argv) == 6:
-    selected_run_type = sys.argv[1].strip().lower()
-    selected_beam_pass = sys.argv[2].strip()
-    selected_num = sys.argv[3].strip().lower()
-    selected_denom = sys.argv[4].strip().lower()
-    nbins = int(sys.argv[5])
-else:
-    selected_run_type = input("Enter desired run type (default HMSDIS): ").strip().lower()
-    if not selected_run_type:
-        selected_run_type = "hmsdis"
-    selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ").strip()
-    selected_num = input("Enter numerator target: ").strip().lower()
-    selected_denom = input("Enter denominator target: ").strip().lower()
-    nbins = int(input("Enter bin number: "))
-    
-selected_beam_pass_to_energy_prefix = {"1": "2.", "2": "4.", "3": "6.", "4": "8.", "5": "10."}
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
-beam_prefix = selected_beam_pass_to_energy_prefix.get(selected_beam_pass)
+selected_run_type = parse_run_type(arg1)
+num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg2)
+denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg3)
+nbins = parse_bins(arg4)
 
-if not beam_prefix:
-    print(f"Unknown pass: {selected_beam_pass}.  Please try again.")
-    exit(1)
-
-selected_target_shortcut_to_target_variable = {
-    "al":"al","al13":"al","aluminum":"al",
-    "c":"c","c12":"c","carbon":"c",
-    "cu":"cu","cu29":"cu","copper":"cu",
-    "opt1":"optics1","optics1":"optics1",
-    "opt2":"optics2","optics2":"optics2",
-    "d2":"ld2","ld2":"ld2",
-    "h2":"lh2","lh2":"lh2",
-    "hole":"hole","chole":"hole","c-hole":"hole",
-    "dummy":"dummy","dum":"dummy"
-}
-
-selected_target_shortname_to_title_longname = {
-    "al":"Aluminum",
-    "c":"Carbon",
-    "cu":"Copper",
-    "opt1":"Optics1",
-    "opt2":"Optics2",
-    "ld2":"Deuterium",
-    "lh2":"Hydrogen",
-    "hole":"Carbon Hole",
-    "dummy":"Dummy"}
-
-# Targets
-num_short = selected_target_shortcut_to_target_variable.get(selected_num)
-if not num_short:
-    print(f"Unknown target: {selected_num}. Please try again.")
-    exit(1)
-num_long = selected_target_shortname_to_title_longname[num_short]
-    
-denom_short = selected_target_shortcut_to_target_variable.get(selected_denom)
-if not denom_short:
-    print(f"Unknown target: {selected_denom}. Please try again.")
-    exit(1)
-denom_long = selected_target_shortname_to_title_longname[denom_short]
-
-selected_target_shortname_to_AZ = {"al":   (27, 13),
-                                   "c":    (12, 6),
-                                   "cu":   (64, 29),
-                                   "ld2":  (2, 1),
-                                   "lh2":  (1, 1)}
-
-A_num, Z_num = selected_target_shortname_to_AZ.get(num_short)
-
-N_num = A_num - Z_num
-
-A_denom, Z_denom = selected_target_shortname_to_AZ.get(denom_short, (0.0, 0.0))
-
-A_ratio = A_num / A_denom
+A_ratio = num_A / denom_A
+num_N = num_A - num_Z
+denom_N = denom_A - denom_Z
 
 vals = get_common_values()
 ebeam_4pass = vals["ebeam_4pass"]
@@ -109,7 +51,7 @@ beam_passes = ["4pass", "5pass"]
 csv_files = []
 
 for beam_pass in beam_passes:
-    csv_files.append(f"{xsec_ratio_dir}/XSEC_RATIO_{selected_run_type}_{beam_pass}_{num_short}_to_{denom_short}.csv")
+    csv_files.append(f"{xsec_ratio_dir}/XSEC_RATIO_{selected_run_type}_{beam_pass}_{num_abbrev}_to_{denom_abbrev}.csv")
 
 all_rows = []
 
@@ -136,15 +78,19 @@ for filepath in csv_files:
 
     # A,Z,eprime,theta,xbj,q2,w,epsilon,modelxsec,xsec_exp,xsec_exp_err
 
-    df["exp"] = f"RSIDIS({pass_label}Pass)"
+    df["setting"] = f"RSIDIS({pass_label}Pass)"
     df["ebeam"] = ebeam
     df["theta"] = theta
     df["w2"] = df["w"] ** 2
     df["bc_corr"] = 0.0
     df["xsec_model_num"] = df["modelxsec_num"]
     df["xsec_model_denom"] = df["modelxsec_denom"]
+    df["num_A"] = num_A
+    df["num_Z"] = num_Z
+    df["denom_A"] = denom_A
+    df["denom_Z"] = denom_Z
 
-    df_out = df[["exp", "A_num", "Z_num","A_denom","Z_denom","ebeam","theta","eprime","xbj", "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom", "xsec_ratio_final", "xsec_ratio_final_err", "bc_corr","xsec_model_num", "xsec_model_denom"]]
+    df_out = df[["setting", "num_A", "num_Z","denom_A","denom_Z","ebeam","theta","eprime","xbj", "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom", "xsec_ratio", "xsec_ratio_err", "bc_corr","xsec_model_num", "xsec_model_denom"]]
 
     df_out = df_out.dropna()
 
@@ -152,14 +98,14 @@ for filepath in csv_files:
 
 df_data = pd.concat(all_rows, ignore_index=True)
 
-output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_short}_to_{denom_short}.csv"
+output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_abbrev}_to_{denom_abbrev}.csv"
 
 # -----------------------------------------------------
 # Determining the bin centers
 # -----------------------------------------------------
 selected_var = "xbj"
 
-df_xbj_minmax = (df_data.groupby("exp")[selected_var].agg(["min", "max"]).reset_index())
+df_xbj_minmax = (df_data.groupby("setting")[selected_var].agg(["min", "max"]).reset_index())
 df_xbj_minmax = df_xbj_minmax.rename(columns={"min": f"{selected_var}_min", "max": f"{selected_var}_max"})
 overlap_min = df_xbj_minmax[f"{selected_var}_min"].max()
 overlap_max = df_xbj_minmax[f"{selected_var}_max"].min()
@@ -168,18 +114,18 @@ overlap_range = float(overlap_max) - float(overlap_min)
 if nbins == 1:
     df_fit = df_data
 
-    exps = df_fit["exp"].unique()
-    if len(exps) < 2:
-        raise ValueError(f"Need at least 2 experiments for common-center fit, got {len(exps)}")
+    settings = df_fit["setting"].unique()
+    if len(settings) < 2:
+        raise ValueError(f"Need at least 2 experiments for common-center fit, got {len(settings)}")
 
     slopes = []
     intercepts = []
-    for exp in exps:
-        sub = df_fit[df_fit["exp"] == exp]
+    for setting in settings:
+        sub = df_fit[df_fit["setting"] == setting]
         x = sub[selected_var].to_numpy()
         y = sub["q2"].to_numpy()
         if len(x) < 2:
-            raise ValueError(f"Not enough points to fit line for {exp}")
+            raise ValueError(f"Not enough points to fit line for {setting}")
         m, b = np.polyfit(x, y, 1)
         slopes.append(m)
         intercepts.append(b)
@@ -190,7 +136,7 @@ if nbins == 1:
     x_min = df_fit[selected_var].min()
     x_max = df_fit[selected_var].max()
 
-    if len(exps) == 2:
+    if len(settings) == 2:
         slope1, slope2 = slopes
         int1, int2 = intercepts
         if np.isclose(slope1, slope2):
@@ -246,9 +192,9 @@ bin_info = []
 for bin_idx, bin_center in enumerate(bin_centers):
     mask = df_data["bin_num"] == bin_idx
     bc_q2_list = []
-    exps = df_data["exp"].unique()
-    for exp in exps:
-        sub = df_data[(df_data["exp"] == exp) & mask]
+    settings = df_data["setting"].unique()
+    for setting in settings:
+        sub = df_data[(df_data["setting"] == setting) & mask]
         if len(sub) < 2:
             continue
         x = sub[selected_var].to_numpy()
@@ -276,8 +222,8 @@ for beam_pass in beam_passes:
         theta_inp = theta_5pass
         ebeam = ebeam_5pass
 
-    infile_names = {"bc_num": f"{selected_run_type}_{beam_pass}_{num_short}",
-                    "bc_denom": f"{selected_run_type}_{beam_pass}_{denom_short}"}
+    infile_names = {"bc_num": f"{selected_run_type}_{beam_pass}_{num_abbrev}",
+                    "bc_denom": f"{selected_run_type}_{beam_pass}_{denom_abbrev}"}
 
     # The input string depends on the version of Dave's xsec tool, mc-single-arm/util/dis_xec/calc_dis_xsec
     # Right now, the input string is flag (0 = fixed theta, bin in eprime; 1 = fixed theta, bin in xbj; 2 = fixed Q2, bin in xbj...
@@ -293,7 +239,6 @@ for beam_pass in beam_passes:
         for label, infile_name in infile_names.items():
 
             input_string = f"2\n{bc_q2:.6f}\n{bc_xbj:.6f}\n1\n1\n{infile_name}\n"
-
             # print(f"INPUT STRING: {input_string}")
 
             try:
@@ -305,12 +250,12 @@ for beam_pass in beam_passes:
                 output = result.stdout
 
                 lines = output.split("\n")
-
-                model_xsec = np.nan
-                model_q2 = np.nan
-                model_xbj = np.nan
+                
                 model_eprime = np.nan
                 model_theta = np.nan
+                model_xbj = np.nan
+                model_q2 = np.nan
+                model_xsec = np.nan
             
                 found_header = False
 
@@ -372,21 +317,28 @@ df_centers["bin_num"] = np.digitize(df_centers["bc_xbj"], edges_centers) - 1
 print(f"\nXSEC Model at Bin Centers")
 print(df_centers)
 
-df_data["bc_xsec_model_num"] = np.nan
-df_data["bc_xsec_model_denom"] = np.nan
-df_data["bc_xbj"] = np.nan
-df_data["bc_q2"] = np.nan
-df_data["bc_eprime"] = np.nan
-df_data["bc_theta"] = np.nan
+# -----------------------------------------------------
+# Computing additional values for the dataframe
+# -----------------------------------------------------
+# df_data["bc_xsec_model_num"] = np.nan
+# df_data["bc_xsec_model_denom"] = np.nan
+# df_data["bc_xbj"] = np.nan
+# df_data["bc_q2"] = np.nan
+# df_data["bc_eprime"] = np.nan
+# df_data["bc_theta"] = np.nan
 
-for _, row in df_centers_bin.iterrows():
-    mask = (df_data["ebeam"] == row["ebeam"]) & (df_data["bin_num"] == row["bin_num"])
-    df_data.loc[mask, "bc_xsec_model_num"] = row["bc_xsec_model_num"]
-    df_data.loc[mask, "bc_xsec_model_denom"] = row["bc_xsec_model_denom"]
-    df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
-    df_data.loc[mask, "bc_q2"] = row["bc_q2"]
-    df_data.loc[mask, "bc_eprime"] = row["bc_eprime"]
-    df_data.loc[mask, "bc_theta"] = row["bc_theta"]
+df_centers_bin = (df_centers.groupby(["bin_num", "ebeam"], as_index=False)[["bc_xsec_model_num", "bc_xsec_model_denom", "bc_xbj", "bc_q2", "bc_eprime", "bc_theta"]].mean())
+
+# for _, row in df_centers_bin.iterrows():
+#     mask = (df_data["ebeam"] == row["ebeam"]) & (df_data["bin_num"] == row["bin_num"])
+#     df_data.loc[mask, "bc_xsec_model_num"] = row["bc_xsec_model_num"]
+#     df_data.loc[mask, "bc_xsec_model_denom"] = row["bc_xsec_model_denom"]
+#     df_data.loc[mask, "bc_xbj"] = row["bc_xbj"]
+#     df_data.loc[mask, "bc_q2"] = row["bc_q2"]
+#     df_data.loc[mask, "bc_eprime"] = row["bc_eprime"]
+#     df_data.loc[mask, "bc_theta"] = row["bc_theta"]
+
+df_data = df_data.merge(df_centers_bin[["bin_num", "ebeam", "bc_xsec_model_num", "bc_xsec_model_denom", "bc_xbj", "bc_q2", "bc_eprime", "bc_theta"]], on=["bin_num", "ebeam"], how="left",)
 
 df_data["bc_corr"] = ((df_data["bc_xsec_model_num"] / df_data["bc_xsec_model_denom"]) /(df_data["xsec_model_num"] / df_data["xsec_model_denom"]))
 
@@ -394,7 +346,7 @@ m_p = 0.93827208943 # proton mass, GeV
 
 alpha = 1 / 137.035999177 # fine structure constant
 
-R_ld2 = 0.2562
+R_ld2 = 0.2557
 
 df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 
@@ -406,19 +358,19 @@ df_data["bc_epsilon_p"] = df_data["bc_epsilon"] / ( 1 + df_data["bc_epsilon"] * 
 
 df_data["bc_gamma"] = alpha / (2 * np.pi**2 * df_data["bc_q2"]) * (df_data["ebeam"] - df_data["bc_nu"]) / (df_data["ebeam"]) * (df_data["bc_nu"] * (1 - df_data["bc_xbj"])) / (1 - df_data["bc_epsilon"])
 
-df_data["sigma_num_to_sigma_denom"] = df_data["xsec_ratio_final"]
+df_data["sigma_num_to_sigma_denom"] = df_data["xsec_ratio"]
 
-df_data["sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"]
+df_data["sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_err"]
 
-df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio_final"] * df_data["bc_corr"]
+df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio"] * df_data["bc_corr"]
 
-df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"] * df_data["bc_corr"]
+df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_err"] * df_data["bc_corr"]
 
 df_data["epsilon_p"] = df_data["epsilon"] / (1 + df_data["epsilon"] * R_ld2)
 
-col_final = ["exp", "A_num", "Z_num", "A_denom", "Z_denom", "ebeam", "theta", "theta_rad", "eprime", "xbj",
+col_final = ["setting", "num_A", "num_Z", "denom_A", "denom_Z", "ebeam", "theta", "theta_rad", "eprime", "xbj",
              "q2", "w2", "epsilon", "epsilon_p", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
-             "xsec_ratio_final", "xsec_ratio_final_err", "sigma_num_to_sigma_denom", "sigma_num_to_sigma_denom_err",
+             "xsec_ratio", "xsec_ratio_err", "sigma_num_to_sigma_denom", "sigma_num_to_sigma_denom_err",
              "bin_num", "bc_xsec_model_num", "bc_xsec_model_denom", "bc_corr",
              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
              "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err"]
@@ -434,9 +386,9 @@ print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].
 
 # df_data["bc_q2"] = df_data["q2"] * df_data["bc_xbj"] / df_data["xbj"]
 
-# df_data["emc"] = slac_emc_fit(df_data["xbj"],df_data["A_num"])
+# df_data["emc"] = slac_emc_fit(df_data["xbj"],df_data["num_A"])
 
-# df_data["bc_emc"] = slac_emc_fit(df_data["bc_xbj"],df_data["A_num"])
+# df_data["bc_emc"] = slac_emc_fit(df_data["bc_xbj"],df_data["num_A"])
 
 # df_data["bc_corr"] = df_data["bc_emc"] / df_data["emc"]
 
@@ -456,13 +408,13 @@ print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].
 
 # df_data["bc_gamma"] = alpha / (2 * np.pi**2 * df_data["bc_q2"]) * (df_data["ebeam"] - df_data["bc_nu"]) / (df_data["ebeam"]) * (df_data["bc_nu"] * (1 - df_data["bc_xbj"])) / (1 - df_data["bc_epsilon"])
 
-# df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio_final"] * df_data["bc_corr"]
+# df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio"] * df_data["bc_corr"]
 
-# df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_final_err"] * df_data["bc_corr"]
+# df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_err"] * df_data["bc_corr"]
 
-# col_final = ["exp", "A_num", "Z_num", "A_denom", "Z_denom", "ebeam", "theta", "theta_rad", "eprime", "xbj",
+# col_final = ["setting", "num_A", "num_Z", "denom_A", "denom_Z", "ebeam", "theta", "theta_rad", "eprime", "xbj",
 #              "q2", "w2", "epsilon", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
-#              "xsec_ratio_final", "xsec_ratio_final_err",
+#              "xsec_ratio", "xsec_ratio_err",
 #              "emc", "bin_num", "bc_emc", "bc_corr",
 #              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
 #              "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err"]
@@ -500,14 +452,14 @@ for i in range(1, len(edges)-1):
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{num_long}/{denom_long} Binning Test (nbins={nbins})")
+plt.title(f"{num_longname}/{denom_longname} Binning Test (nbins={nbins})")
 
 plt.legend()
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
-plt.savefig(f"PNGs/{selected_run_type}_{num_short}_to_{denom_short}_binning_test.png")
+plt.savefig(f"PNGs/{selected_run_type}_{num_abbrev}_to_{denom_abbrev}_binning_test.png")
 
-plt.show()
+#plt.show()
 
 plt.close()
     

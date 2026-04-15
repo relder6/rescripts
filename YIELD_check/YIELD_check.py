@@ -10,10 +10,13 @@ import csv
 import boost_histogram as bh
 from tqdm import tqdm
 import uproot
+import mplhep
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_common_run_inputs, get_data_cuts
+
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -194,60 +197,74 @@ with PdfPages(output_pdf_filepath) as pdf:
     x_idx_pos = np.arange(len(pos_df))
 
     # Yield vs Run Number page 1
+    plt.style.use(mplhep.style.ROOT)
+    plt.rcParams.update({"figure.titlesize": 14,
+                         "axes.titlesize": 12,
+                         "axes.labelsize": 10,
+                         "legend.fontsize": 8,
+                         "xtick.labelsize": 8,
+                         "ytick.labelsize": 8})
     fig, (ax_top, ax_bot) = plt.subplots(2,1,figsize=(8.5,11/2), gridspec_kw={"height_ratios":[1,1], "hspace": 0.35}, sharex=False)
 
     fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Yield vs Run Number", fontsize=12, y=0.98)
     
-    ax_top.axhline(elec_p0, linestyle="--", color="cornflowerblue", linewidth=1.5, label="p₀ fit", zorder=1)
+    ax_top.axhline(elec_p0, linestyle="--", color="cornflowerblue", linewidth=1.5, label="$p_0$ fit", zorder=1)
     ax_top.errorbar(x_idx,elec_df["yield"].to_numpy(),yerr=elec_df["yield_err"].to_numpy(),fmt="o", markersize=3, color="navy", label = "Electrons", zorder=2)
     ax_top.set_xticks(x_idx)
     ax_top.set_xticklabels(elec_df["runnum"].astype(str), rotation=45)
-    ax_top.tick_params(axis="x", labelsize=8)
-    ax_top.set_ylabel("Electron Yield", fontsize=10)
+    ax_top.tick_params(axis="x")
+    ax_top.set_ylabel("Electron Yield")
     ax_top.grid(True)
     ax_top.axhspan(elec_lo, elec_hi, color="lightskyblue", alpha=0.3, label=rf"±{elec_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
-    ax_top.text(0.02, 0.95, f"$\\chi^2/ndof = {elec_chi2_ndof: .2f}$", transform = ax_top.transAxes, fontsize = 9, verticalalignment = 'top')
-    ax_top.legend(fontsize = 6)
+    ax_top.text(0.02, 0.95, f"$/chi^2/ndf$ = {elec_chi2_ndof: .2f}", transform = ax_top.transAxes, verticalalignment = 'top', fontsize = 9)
+    ax_top.legend()
 
-    ax_bot.axhline(pos_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="p₀ Fit", zorder=1)
+    ax_bot.axhline(pos_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="$p_0$ Fit", zorder=1)
     ax_bot.errorbar(x_idx_pos,pos_df["yield"].to_numpy(),yerr=pos_df["yield_err"].to_numpy(),fmt="o", markersize=3, color="red", label = "Positrons", zorder=2)
     ax_bot.set_xticks(x_idx_pos)
     ax_bot.set_xticklabels(pos_df["runnum"].astype(str), rotation=45)
-    ax_bot.tick_params(axis="x", labelsize=8)
-    ax_bot.set_ylabel("Positron Yield", fontsize=10)
-    ax_bot.set_xlabel("Run Number", fontsize=10)
+    ax_bot.tick_params(axis="x")
+    ax_bot.set_ylabel("Positron Yield")
+    ax_bot.set_xlabel("Run Number")
     ax_bot.grid(True)
-    ax_bot.axhspan(pos_lo, pos_hi, color="mistyrose", alpha = 0.3, label = rf"±{pos_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
-    ax_bot.text(0.02, 0.95, f"$\\chi^2/ndof = {pos_chi2_ndof: .2f}$", transform = ax_bot.transAxes, fontsize = 9, verticalalignment = 'top')
-    ax_bot.legend(fontsize = 6)
+    ax_bot.axhspan(pos_lo, pos_hi, color="mistyrose", alpha = 0.3, label = rf"$\pm${pos_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
+    ax_bot.text(0.02, 0.95, f"$/chi^2/ndf$ = {pos_chi2_ndof: .2f}", transform = ax_bot.transAxes, fontsize = 9, verticalalignment = 'top')
+    ax_bot.legend()
     
-    fig.subplots_adjust(top = 0.95, bottom = 0.13)
+    # fig.subplots_adjust(top = 0.95, bottom = 0.13)
     pdf.savefig(fig)
     plt.close(fig)
 
     # Yield vs Beam Current pg 2
+    plt.style.use(mplhep.style.ROOT)
+    plt.rcParams.update({"figure.titlesize": 14,
+                        "axes.titlesize": 12,
+                        "axes.labelsize": 10,
+                        "legend.fontsize": 8,
+                        "xtick.labelsize": 8,
+                        "ytick.labelsize": 8})
     fig, (ax_top, ax_bot) = plt.subplots(2,1,figsize=(8.5,11/2), gridspec_kw={"height_ratios":[1,1], "hspace": 0.15}, sharex=False)
 
-    fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Yield vs Beam Current", fontsize=12, y=0.98)
+    fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Yield vs Beam Current", y=0.98)
 
     ax_top.axhline(elec_current_p0, linestyle="--", color="cornflowerblue", linewidth=1.5, label="p₀ fit", zorder=1)
     ax_top.errorbar(df.loc[elec_mask, "current"].to_numpy(), df.loc[elec_mask, "yield"].to_numpy(), yerr = df.loc[elec_mask, "yield_err"].to_numpy(), fmt = "o", markersize = 3, color = "navy", label = "Positrons", zorder = 2)
     ax_top.tick_params(axis="x", labelsize=8)
-    ax_top.axhspan(elec_current_lo, elec_current_hi, color="lightskyblue", alpha=0.3, label=rf"±{elec_current_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
-    ax_top.set_ylabel("Electron Yield", fontsize=10)
-    ax_top.text(0.02, 0.95, f"$\\chi^2/ndof = {elec_current_chi2_ndof: .2f}$", transform = ax_top.transAxes, fontsize = 9, verticalalignment = 'top')
+    ax_top.axhspan(elec_current_lo, elec_current_hi, color="lightskyblue", alpha=0.3, label=rf"$\pm${elec_current_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
+    ax_top.set_ylabel("Electron Yield")
+    ax_top.text(0.02, 0.95, f"$\chi^2/ndf$ = {elec_current_chi2_ndof: .2f}", transform = ax_top.transAxes, fontsize = 9, verticalalignment = 'top')
     ax_top.grid(True)
 
-    ax_bot.axhline(pos_current_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="p₀ Fit", zorder=1)
+    ax_bot.axhline(pos_current_p0, linestyle="--", color="lightcoral", alpha=0.8, linewidth=1.5, label="$p_0$ Fit", zorder=1)
     ax_bot.errorbar(df.loc[pos_mask, "current"].to_numpy(), df.loc[pos_mask, "yield"].to_numpy(), yerr = df.loc[pos_mask, "yield_err"].to_numpy(), fmt = "o", markersize = 3, color = "red", label = "Data", zorder=2)
-    ax_bot.tick_params(axis="x", labelsize=8)
-    ax_bot.set_xlabel("Beam Current (µA)", fontsize=10)
-    ax_bot.set_ylabel("Positron Yield", fontsize=10)
-    ax_bot.axhspan(pos_current_lo, pos_current_hi, color="mistyrose", alpha = 0.3, label = rf"±{pos_current_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
-    ax_bot.text(0.02, 0.95, f"$\\chi^2/ndof = {pos_current_chi2_ndof: .2f}$", transform = ax_bot.transAxes, fontsize = 9, verticalalignment = 'top')
+    ax_bot.tick_params(axis="x")
+    ax_bot.set_xlabel("Beam Current (µA)")
+    ax_bot.set_ylabel("Positron Yield")
+    ax_bot.axhspan(pos_current_lo, pos_current_hi, color="mistyrose", alpha = 0.3, label = rf"$\pm${pos_current_sigma_percent:.1f}% (1 $\sigma$)", zorder=0)
+    ax_bot.text(0.02, 0.95, f"$\chi^2/ndf$ = {pos_current_chi2_ndof: .2f}", transform = ax_bot.transAxes, fontsize = 9, verticalalignment = 'top')
     ax_bot.grid(True)
 
-    fig.subplots_adjust(top = 0.95, bottom = 0.10)
+    # fig.subplots_adjust(top = 0.95, bottom = 0.10)
     pdf.savefig(fig)
     plt.close(fig)
 

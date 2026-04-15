@@ -12,28 +12,25 @@ import subprocess
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import get_common_run_inputs, get_data_cuts, get_common_values
+from INIT.config import get_data_cuts, get_common_values
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
 # -----------------------------------------------------
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+
+selected_run_type = parse_run_type(arg1)
+target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg2)
+nbins = parse_bins(arg3)
 
 vals = get_common_values()
-
 ebeam_4pass = vals["ebeam_4pass"]
-
 theta_4pass = vals["angle_4pass"]
-
 ebeam_5pass = vals["ebeam_5pass"]
-
 theta_5pass = vals["angle_5pass"]
-
-if len(sys.argv) > 4:
-    nbins = int(sys.argv[4])
-
-else:
-    nbins = int(input("Indicate number of bins: "))
 
 model_xsec_dir = "../../../mc-single-arm/util/dis_xec"
 
@@ -47,7 +44,7 @@ beam_passes = ["4pass", "5pass"]
 csv_files = []
 
 for beam_pass in beam_passes:
-    csv_files.append(f"{xsec_dir}/{selected_target_shortname.upper()}/XSEC_{selected_run_type}_{beam_pass}_{selected_target_shortname}.csv")
+    csv_files.append(f"{xsec_dir}/{target_abbrev.upper()}/XSEC_{selected_run_type}_{beam_pass}_{target_abbrev}.csv")
 
 all_rows = []
 
@@ -74,14 +71,14 @@ for filepath in csv_files:
 
     # A,Z,eprime,theta,xbj,q2,w,epsilon,modelxsec,xsec_exp,xsec_exp_err
 
-    df["exp"] = f"RSIDIS({pass_label}Pass)"
+    df["setting"] = f"RSIDIS({pass_label}Pass)"
     df["ebeam"] = ebeam
     df["theta"] = theta
     df["w2"] = df["w"] ** 2
     df["xsec_model"] = df["modelxsec"]
     df["bc_corr"] = 0.0
 
-    df_out = df[["exp", "A", "Z","ebeam","theta","eprime","xbj", "q2", "w2", "epsilon","xsec_exp", "xsec_exp_err", "xsec_model", "bc_corr"]]
+    df_out = df[["setting", "A", "Z","ebeam","theta","eprime","xbj", "q2", "w2", "epsilon","xsec_exp", "xsec_exp_err", "xsec_model", "bc_corr"]]
 
     df_out = df_out.dropna()
 
@@ -89,14 +86,14 @@ for filepath in csv_files:
 
 df_data = pd.concat(all_rows, ignore_index=True)
 
-output_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_{selected_target_shortname}.csv"
+output_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_{target_abbrev}.csv"
 
 # -----------------------------------------------------
 # Determining the bin centers
 # -----------------------------------------------------
 selected_var = "xbj"
 
-df_xbj_minmax = (df_data.groupby("exp")[selected_var].agg(["min", "max"]).reset_index())
+df_xbj_minmax = (df_data.groupby("setting")[selected_var].agg(["min", "max"]).reset_index())
 df_xbj_minmax = df_xbj_minmax.rename(columns={"min": f"{selected_var}_min", "max": f"{selected_var}_max"})
 overlap_min = df_xbj_minmax[f"{selected_var}_min"].max()
 overlap_max = df_xbj_minmax[f"{selected_var}_max"].min()
@@ -105,18 +102,18 @@ overlap_range = float(overlap_max) - float(overlap_min)
 if nbins == 1:
     df_fit = df_data
 
-    exps = df_fit["exp"].unique()
-    if len(exps) < 2:
-        raise ValueError(f"Need at least 2 experiments for common-center fit, got {len(exps)}")
+    settings = df_fit["setting"].unique()
+    if len(settings) < 2:
+        raise ValueError(f"Need at least 2 experiments for common-center fit, got {len(settings)}")
 
     slopes = []
     intercepts = []
-    for exp in exps:
-        sub = df_fit[df_fit["exp"] == exp]
+    for setting in settings:
+        sub = df_fit[df_fit["setting"] == setting]
         x = sub[selected_var].to_numpy()
         y = sub["q2"].to_numpy()
         if len(x) < 2:
-            raise ValueError(f"Not enough points to fit line for {exp}")
+            raise ValueError(f"Not enough points to fit line for {setting}")
         m, b = np.polyfit(x, y, 1)
         slopes.append(m)
         intercepts.append(b)
@@ -127,7 +124,7 @@ if nbins == 1:
     x_min = df_fit[selected_var].min()
     x_max = df_fit[selected_var].max()
 
-    if len(exps) == 2:
+    if len(settings) == 2:
         slope1, slope2 = slopes
         int1, int2 = intercepts
         if np.isclose(slope1, slope2):
@@ -176,16 +173,16 @@ if nbins != 1:
 
 print(f"Overlap range: {overlap_min:.4f} → {overlap_max:.4f}")
 print(f"Stepsize: {stepsize:.4f}")
-print(f"Bin centers ({nbins} bins):\n{bin_centers}")
+print(f"Bin centers ({nbins} bins): {bin_centers}")
 
 bin_info = []
 
 for bin_idx, bin_center in enumerate(bin_centers):
     mask = df_data["bin_num"] == bin_idx
     bc_q2_list = []
-    exps = df_data["exp"].unique()
-    for exp in exps:
-        sub = df_data[(df_data["exp"] == exp) & mask]
+    settings = df_data["setting"].unique()
+    for setting in settings:
+        sub = df_data[(df_data["setting"] == setting) & mask]
         if len(sub) < 2:
             continue
         x = sub[selected_var].to_numpy()
@@ -213,7 +210,7 @@ for beam_pass in beam_passes:
         theta_inp = theta_5pass
         ebeam = ebeam_5pass
         
-    infile_name = f"{selected_run_type}_{beam_pass}_{selected_target_shortname}"
+    infile_name = f"{selected_run_type}_{beam_pass}_{target_abbrev}"
 
     # The input string depends on the version of Dave's xsec tool, mc-single-arm/util/dis_xec/calc_dis_xsec
     # Right now, the input string is flag (0 = fixed theta, bin in eprime; 1 = fixed theta, bin in xbj; 2 = fixed Q2, bin in xbj...
@@ -225,7 +222,7 @@ for beam_pass in beam_passes:
         bin_num = bin_row["bin_num"]
         
         input_string = f"2\n{bc_q2:.6f}\n{bc_xbj:.6f}\n1\n1\n{infile_name}\n"
-        print(f"INPUT STRING: {input_string}")
+        # print(f"INPUT STRING: {input_string}")
 
         try:
             result = subprocess.run(["./calc_dis_xsec"], input=input_string, text=True, capture_output=True, cwd=model_xsec_dir)
@@ -263,11 +260,11 @@ for beam_pass in beam_passes:
                         except:
                             pass
                         
-            if model_xsec is np.nan:
+            if np.isnan(model_xsec):
                 print(f"Failed to parse xsec for {beam_pass}, bin {bin_center}")
                 
-            model_results.append({"A": selected_target_A,
-                                  "Z": selected_target_Z,
+            model_results.append({"A": target_A,
+                                  "Z": target_Z,
                                   "ebeam": ebeam,
                                   "bc_eprime": model_eprime,
                                   "bc_theta": model_theta,
@@ -334,7 +331,7 @@ df_data["bc_sigma_R"] = df_data["xsec_exp"] * df_data["bc_corr"] / df_data["bc_g
 
 df_data["bc_sigma_R_err"] = df_data["xsec_exp_err"] * df_data["bc_corr"] / df_data["bc_gamma"]
 
-col_final = ["exp", "A", "Z", "ebeam", "theta", "theta_rad",
+col_final = ["setting", "A", "Z", "ebeam", "theta", "theta_rad",
              "eprime", "xbj", "q2", "w2",
              "epsilon", "nu",      
              "xsec_exp", "xsec_exp_err",
@@ -379,14 +376,14 @@ for i in range(1, len(edges)-1):
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{selected_target_titlename} Binning Test (nbins={nbins})")
+plt.title(f"{target_longname} Binning Test (nbins={nbins})")
 
 plt.legend()
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
-plt.savefig("PNGs/{selected_run_type}_{selected_target_shortname}_binning_test.png")
+plt.savefig(f"PNGs/{selected_run_type}_{target_abbrev}_binning_test.png")
 
-plt.show()
+# plt.show()
 
 plt.close()
     

@@ -10,21 +10,27 @@ import os, re, sys
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import get_common_run_inputs
+from INIT.config import parse_run_type, parse_beam_pass, parse_target
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+
+selected_run_type = parse_run_type(arg1)
+selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
+target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
 
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-model_xsec_filepath = f"../MODEL_xsec/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_model_xsec.csv"
+model_xsec_filepath = f"../MODEL_xsec/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_model_xsec.csv"
 
-data_to_mc_filepath = f"../DATA_to_MC/{selected_target_shortname.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_H_gtr_dp.csv"
+data_to_mc_filepath = f"../DATA_to_MC/{target_abbrev.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_H_gtr_dp.csv"
 
-xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.pdf"
+xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}.pdf"
 
 # -----------------------------------------------------
 # Preparing Dataframes
@@ -54,13 +60,13 @@ df_merged["xsec_exp_err"] = df_merged["xsec_exp_err"].replace([np.inf, -np.inf],
 # Save output csv
 # -----------------------------------------------------
 
-df_merged["A"] = selected_target_A
-df_merged["Z"] = selected_target_Z
+df_merged["A"] = target_A
+df_merged["Z"] = target_Z
 
-output_dir = f"{selected_target_shortname.upper()}"
+output_dir = f"{target_abbrev.upper()}"
 os.makedirs(output_dir, exist_ok=True)
 
-output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.csv"
+output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}.csv"
 
 final_columns = ["A", "Z", "eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
 
@@ -97,7 +103,7 @@ for var, val in vars_to_plot.items():
     ax1.plot(val[mask], model[mask], linestyle=":", color='red', label="Model")
 
     ax1.set_ylabel("Cross Section (μb/GeV/sr)")
-    ax1.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {selected_target_titlename} Nuclear Cross Section")
+    ax1.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Nuclear Cross Section")
     ax1.grid()
     ax1.legend()
 

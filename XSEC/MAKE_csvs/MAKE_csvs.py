@@ -13,33 +13,38 @@ import csv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import get_common_run_inputs, get_data_cuts
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_cuts
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-USING_DELTA_CORR = True
+USING_DELTA_CORR = False
 
-selected_run_type, selected_beam_pass, beam_prefix, selected_target_shortname, selected_target_titlename, selected_target_A, selected_target_Z = get_common_run_inputs()
+arg1 = sys.argv[1] if len(sys.argv) > 1 else None
+arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+
+selected_run_type = parse_run_type(arg1)
+selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
+target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
 
 # -----------------------------------------------------
-# File paths
+# Filepaths
 # -----------------------------------------------------
 rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0"
 mc_dir = "/work/hallc/c-rsidis/relder/mc-single-arm"
-input_settings_filepath = f"../../FILTER_type/{selected_target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_runs.dat"
-
-output_dir = f"{selected_target_shortname.upper()}"
+input_settings_filepath = f"../../FILTER_type/{target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_runs.dat"
+output_dir = f"{target_shortname.upper()}"
 
 # -----------------------------------------------------
 # Reading in monte-carlo report to obtain normfac
 # -----------------------------------------------------
-if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
-    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.root"
+if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_{target_shortname.lower()}.root"
     if not os.path.exists(mc_filepath):
-        print(f"WARNING:\tNo mc-single-arm generated root file found for {selected_run_type}_{selected_beam_pass}_{selected_target_shortname}. Exiting...")
+        print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Exiting...")
         exit(1)
-    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}.out"
+    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_{target_shortname.lower()}.out"
     with open(mc_report_filepath, "r") as infile:
         normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
     normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
@@ -62,11 +67,11 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
             weight.append(row["weight"])
             hms_p_val = float(row["hms_p"])
             polarity.append("-" if hms_p_val < 0 else "+")
-            print("RAW hms_p:", repr(row.get("hms_p")))
         except KeyError:
             continue
         except ValueError:
             continue
+print(f"Found {len(runnums)} runs, processing...")
 
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
@@ -170,7 +175,7 @@ for i, runnum in enumerate(runnums):
      for var, bins in custom_bins.items():
          axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
 
-         if selected_target_shortname == "dummy":
+         if target_shortname == "dummy":
 
              hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
              hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
@@ -237,7 +242,7 @@ for i, runnum in enumerate(runnums):
 # -----------------------------------------------------
 # Monte carlo histogram and csv creation
 # -----------------------------------------------------
-if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
     mc_file = uproot.open(mc_filepath)
     mc_tree = mc_file["h10"]
     df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
@@ -258,21 +263,21 @@ if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
 for var, bins in custom_bins.items():
     mc_var = None
     
-    if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         mc_var = variable_mc_map.get(var)
         
-    if mc_var is None or selected_target_shortname in {"dummy", "optics1", "optics2", "hole"}:
+    if mc_var is None or target_shortname in {"dummy", "optics1", "optics2", "hole"}:
         continue
     
     axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"])
-    if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         hist_mc = bh.Histogram(axis, storage=bh.storage.Weight())
 
         if "weight" in df_mc_cut.columns:
             delta_temp = df_mc_cut["hsdelta"].values
             deltacorr = 1.0
 
-            if selected_target_shortname in {"c", "cu"}:
+            if target_shortname in {"al", "c", "cu"}:
                 # Determined only with carbon,
                 a = 1.012441e+00
                 b = 3.055522e-03
@@ -290,7 +295,7 @@ for var, bins in custom_bins.items():
 
                 deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
 
-            elif selected_target_shortname in {"ld2", "lh2"}:
+            elif target_shortname in {"ld2", "lh2", "dummy"}:
                 a = 1.011192e+00
                 b = 5.168480e-03
                 c = -1.104189e-03
@@ -333,22 +338,22 @@ for var, rows in hist_data.items():
 
     # Saving here for counts
     hist_df = pd.DataFrame(rows, columns=columns)
-    if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         mc_row = ["MC", "0", "mc"] + mc_hist_data[var]
         hist_df = pd.concat([pd.DataFrame([mc_row], columns=columns), hist_df], ignore_index = True)
     
-    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_histo.csv"
+    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_{var}_histo.csv"
     output_filepath = f"{output_dir}/{output_filename}"
     hist_df.to_csv(output_filepath, index=False)
 
     # Saving here for error bars
     hist_err_df = pd.DataFrame(hist_err_data[var], columns=columns)
-    if selected_target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
         mc_err_row = ["MC", "0", "0"] + mc_hist_err[var]
         hist_err_df = pd.concat([pd.DataFrame([mc_err_row], columns=columns), hist_err_df], ignore_index=True)
     
-    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{selected_target_shortname}_{var}_err.csv"
+    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_{var}_err.csv"
     output_err_filepath = f"{output_dir}/{output_err_filename}"
     hist_err_df.to_csv(output_err_filepath, index=False)
     
-print(f"Saved {output_filename} and {output_err_filename} to {output_filepath}.")
+print(f"Saved output CSV files to {target_shortname.upper()}/ folder.")
