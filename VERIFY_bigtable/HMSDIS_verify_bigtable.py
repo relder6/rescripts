@@ -4,25 +4,20 @@ import os, re
 import numpy as np
 import csv
 
-# =====================================================================
+# -----------------------------------------------------
 # Defining paths here
-# =====================================================================
-
+# -----------------------------------------------------
 input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
-report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
-run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
+report_filepath = "/work/hallc/c-rsidis/replay/pass0p1/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
+run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
 
-output_filepath = "singles_check.csv"
+output_filepath = "CSVs/hmsdis_check.csv"
 
-skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860, 24482, 24496, 25013]
-# Runs 23853 - 23860 are commissioning runs; skipping these for now
-# What is happening with yields on 24482, 24496, 25013?
+skip_runnums = []
 
-
-# =====================================================================
+# -----------------------------------------------------
 # Reading auxfiles runlist, filtering and extracting lines
-# =====================================================================
-
+# -----------------------------------------------------
 with open(input_filepath, "r") as infile:
     lines = infile.readlines()
 
@@ -60,10 +55,9 @@ for line in run_lines:
     if (run_type == "hmsdis" or run_type == "shmsdis") and runnum not in skip_runnums:
         filtered_lines.append(line)
 
-# =====================================================================
+# -----------------------------------------------------
 # Reading in big table values
-# =====================================================================
-
+# -----------------------------------------------------
 runinfo_lookup = {}
 if os.path.exists(run_info_filepath):
     with open(run_info_filepath, "r") as csvfile:
@@ -72,38 +66,34 @@ if os.path.exists(run_info_filepath):
             try:
                 runnum = int(row["run"])
                 runinfo_lookup[runnum] = {
-                    "bt_ebeam": row.get("ebeam", "N/A"),
-                    "bt_target": row.get("target", "N/A"),
-                    "bt_hms_p": row.get("hms_p", "N/A"),
-                    "bt_hms_th": row.get("hms_th", "N/A"),
-                    "bt_shms_p": row.get("shms_p", "N/A"),
-                    "bt_shms_th": row.get("shms_th", "N/A"),
-                    "bt_run_type": row.get("run_type", "N/A"),
-                    "bt_bcm2q": row.get("BCM2_Q", "N/A"),
-                    "bt_bcm2i": row.get("BCM2_I", "N/A"),
-                    "bt_ps3": row.get("ps3", "N/A"),
-                    "bt_ps4": row.get("ps4", "N/A"),
-                    "bt_comp_livetime": row.get("comp_livetime", "N/A"),
-                    "fan_current_correction": row.get("fan_current_correction", "N/A"),
-                    "fan_mean": row.get("fan_mean", "N/A"),
-                    "bt_Q2": row.get("Q2", "N/A"),
-                    "bt_xbj": row.get("x", "N/A"),
-                    "bt_ps3": row.get("ps3", "N/A"),
-                    "bt_ps4": row.get("ps4", "N/A"),
-                    "bt_ps1": row.get("ps1", "N/A"),
-                    "bt_ps2": row.get("ps2", "N/A"),
+                    "bt_ebeam": row.get("ebeam", None),
+                    "bt_target": row.get("target", None),
+                    "bt_hms_p": row.get("hms_p", None),
+                    "bt_hms_th": row.get("hms_th", None),
+                    "bt_shms_p": row.get("shms_p", None),
+                    "bt_shms_th": row.get("shms_th", None),
+                    "bt_run_type": row.get("run_type", None),
+                    "bt_bcm2q": row.get("BCM2_Q", None),
+                    "bt_bcm2i": row.get("BCM2_I", None),
+                    "bt_ps1": row.get("ps1", None),
+                    "bt_ps2": row.get("ps2", None),
+                    "bt_ps3": row.get("ps3", None),
+                    "bt_ps4": row.get("ps4", None),
+                    "bt_comp_livetime": row.get("comp_livetime", None),
+                    "bt_boil_corr": row.get("boil_corr", None),
+                    "bt_fan_mean": row.get("fan_mean", None),
+                    "bt_Q2": row.get("Q2", None),
+                    "bt_xbj": row.get("x", None),
                     }
 
             except (ValueError, KeyError) as e:
                 print(f"Warning: skipping row due to error: {e}")
 
-# =====================================================================
+# -----------------------------------------------------
 # Reading in report files and compiling the tsv
-# =====================================================================
-
+# -----------------------------------------------------
 with open(output_filepath, "w") as outfile:
-    # Write header
-    outfile.write("#Run#,eBeam_diff,iBeam_diff,targ,type,Q2_difference,xbj_difference,HMSp_diff,HMSth_diff,SHMSp_diff,SHMSth_diff,Livetime_diff\n")
+    outfile.write("runnum,ebeam_diff,ibeam_diff,targ,type,q2_difference,xbj_difference,hms_p_diff,hms_th_diff,shms_p_diff,shms_th_diff,livetime_diff,ps3_diff,ps4_diff\n")
 
     for line in filtered_lines:
         parts = re.split(r'\s+', line.strip())
@@ -121,7 +111,7 @@ with open(output_filepath, "w") as outfile:
         runtype = parts[11]
         comment = ""
 
-        # -- Extracting values from the report files
+        # Report file extraction
         report_file = report_filepath.format(runnum=runnum)
         bcm2cutch, ps3, ps4, trackeff, phystriggers, helreal, ps1, ps2 = "-999", "-999", "-999", "-999", "-999", "-999", "-999", "-999"
 
@@ -164,7 +154,7 @@ with open(output_filepath, "w") as outfile:
         ps3_val, ps4_val = float(ps3), float(ps4)
         ps1_val, ps2_val = float(ps1), float(ps2)
         if ps3_val == -999 or ps4_val == -999 or ps1_val == -999 or ps2_val == -999:
-            print(f"WARNING: run {runnum} has issues with prescale values. Skipping.")
+            print(f"REPORT FILE WARNING: Run {runnum} has issues with prescale values. Skipping...")
             continue
         elif ps3_val != -1 and ps4_val != -1:
             ps = ps3_val
@@ -191,25 +181,23 @@ with open(output_filepath, "w") as outfile:
         xbj = Q2 / (2 * 0.938 * abs(float(nu)))
 
         runnum_int = int(runnum)
-        runinfo_val = runinfo_lookup.get(runnum_int, {
-            "bt_ebeam": "N/A",
-            "bt_bcm2i": "N/A",
-            "bt_run_type": "N/A",
-            "bt_Q2": "N/A",
-            "bt_target": "N/A",
-            "fan_mean": "N/A",
-            "fan_current_correction": "N/A",
-            "bt_hms_p": "N/A",
-            "bt_hms_th": "N/A",
-            "bt_shms_p": "N/A",
-            "bt_shms_th": "N/A",
-            "bt_comp_livetime": "N/A",
-            "bt_xbj": "N/A",
-            "bt_ps3": "N/A",
-            "bt_ps4": "N/A",
-        })
+        runinfo_val = runinfo_lookup.get(runnum_int, {"bt_ebeam": None,
+                                                      "bt_bcm2i": None,
+                                                      "bt_run_type": None,
+                                                      "bt_Q2": None,
+                                                      "bt_target": None,
+                                                      "bt_fan_mean": None,
+                                                      "bt_boil_corr": None,
+                                                      "bt_hms_p": None,
+                                                      "bt_hms_th": None,
+                                                      "bt_shms_p": None,
+                                                      "bt_shms_th": None,
+                                                      "bt_comp_livetime": None,
+                                                      "bt_xbj": None,
+                                                      "bt_ps3": None,
+                                                      "bt_ps4": None,})
 
-        # --- New comparison logic
+        # Bigtable extraction
         bt_ebeam = runinfo_val["bt_ebeam"]
         bt_bcm2i = runinfo_val["bt_bcm2i"]
         bt_run_type = runinfo_val["bt_run_type"]
@@ -227,58 +215,66 @@ with open(output_filepath, "w") as outfile:
         try:
             ebeam_diff = float(ebeam) - float(bt_ebeam)
         except:
-            ebeam_diff = "N/A"
+            ebeam_diff = None
         try:
             ibeam_diff = float(ibeam) - float(bt_bcm2i)
         except:
-            ibeam_diff = "N/A"
+            ibeam_diff = None
         try:
             hms_p_diff = float(hms_p) - float(bt_hms_p)
         except:
-            hms_p_diff = "N/A"
+            hms_p_diff = None
         try:
             hms_th_diff = float(hms_th) - float(bt_hms_th)
         except:
-            hms_th_diff = "N/A"
+            hms_th_diff = None
         try:
             shms_p_diff = float(shms_p) - float(bt_shms_p)
         except:
-            shms_p_diff = "N/A"
+            shms_p_diff = None
         try:
             shms_th_diff = float(shms_th) - float(bt_shms_th)
         except:
-            shms_th_diff = "N/A"
+            shms_th_diff = None
 
         runtype_match = str(runtype).strip().lower() == str(bt_run_type).strip().lower()
         target_match = str(target).strip().lower() == str(bt_target).strip().lower()
         try:
             livetime_diff = float(livetime) - float(bt_comp_livetime)
         except:
-            livetime_diff = "N/A"
+            livetime_diff = None
         try:
             Q2_diff = float(Q2) - float(bt_Q2)
         except:
-            Q2_diff = "N/A"
+            Q2_diff = None
         try:
             xbj_diff = float(xbj) - float(bt_xbj)
         except:
-            xbj_diff = "N/A"
+            xbj_diff = None
         try:
             ps3_diff = float(ps3) - float(bt_ps3)
         except:
-            ps3_diff = "N/A"
+            ps3_diff = None
         try:
             ps4_diff = float(ps4) - float(bt_ps4)
         except:
-            ps4_diff = "N/A"
+            ps4_diff = None
 
-        # --- Write output row (always)
-        csv_line = ",".join(map(str, [
-            runnum, f"{ebeam_diff:.6f}", f"{ibeam_diff:.6f}", target_match,
-            runtype_match, f"{Q2_diff:.6f}", f"{xbj_diff:.6f}", f"{hms_p_diff:.6f}", f"{hms_th_diff:.6f}", f"{shms_p_diff:.6f}", f"{shms_th_diff:.6f}",
-            f"{livetime_diff:.6f}",
-        ]))
-
+        # Output CSV writing
+        csv_line = ",".join(map(str, [runnum,
+                                      f"{ebeam_diff:.6f}" if ebeam_diff is not None else "N/A",
+                                      f"{ibeam_diff:.6f}" if ibeam_diff is not None else "N/A",
+                                      target_match,
+                                      runtype_match,
+                                      f"{Q2_diff:.6f}" if Q2_diff is not None else "N/A",
+                                      f"{xbj_diff:.6f}" if xbj_diff is not None else "N/A",
+                                      f"{hms_p_diff:.6f}" if hms_p_diff is not None else "N/A",
+                                      f"{hms_th_diff:.6f}" if hms_th_diff is not None else "N/A",
+                                      f"{shms_p_diff:.6f}" if shms_p_diff is not None else "N/A",
+                                      f"{shms_th_diff:.6f}" if shms_th_diff is not None else "N/A",
+                                      f"{livetime_diff:.6f}" if livetime_diff is not None else "N/A",
+                                      f"{ps3_diff:.6f}" if ps3_diff is not None else "N/A",
+                                      f"{ps4_diff:.6f}" if ps3_diff is not None else "N/A",]))
         outfile.write(csv_line + "\n")
 
 print(f"\n☢️  Wrote {len(filtered_lines)} HMSDIS runs to {output_filepath}")
