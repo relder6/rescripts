@@ -18,7 +18,7 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-USING_DELTA_CORR = False
+USING_DELTA_CORR = True
 
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
@@ -284,14 +284,6 @@ for var, bins in custom_bins.items():
                 c = -1.111970e-03
                 d = -6.311775e-05
                 e = 1.411932e-05
-
-                # Determined with carbon & copper
-                # a = 1.011460e+00
-                # b = 3.693367e-03
-                # c = -1.053783e-03
-                # d = -8.972322e-05
-                # e = 1.372362e-05
-
 
                 deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
 

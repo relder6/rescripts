@@ -11,6 +11,8 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
+USING_CURRENT_OFFSET = True
+
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
                 #Now skipping the low current (< 10 uA) runs,
                 23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
@@ -91,10 +93,14 @@ if os.path.exists(bigtable_filepath):
                     q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
                     epsilon = 1 / (1 + 2 * (1 + (nu**2 / q2)) * np.tan(hms_th_rad/ 2))**2
 
-                    current_offset_corr = 1
-
-                    # if target_shortname == "cu":
-                    #     current_offset_corr = 1 / (1 + (0.279928 / float(ibeam) ))
+                    if USING_CURRENT_OFFSET:
+                        if target_abbrev in ["al", "c", "cu"]:
+                            current_offset = -0.0301
+                            current_offset_corr = 1 / (1 + (current_offset / float(ibeam)))
+                        else:
+                            current_offset_corr = 1
+                    else:
+                        current_offset_corr = 1
 
                     weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
 

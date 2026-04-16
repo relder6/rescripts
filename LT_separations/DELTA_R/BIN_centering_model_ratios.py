@@ -345,7 +345,7 @@ m_p = 0.93827208943 # proton mass, GeV
 
 alpha = 1 / 137.035999177 # fine structure constant
 
-R_ld2 = 0.2557
+R_ld2 = 0.26577787453885426
 
 df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 
