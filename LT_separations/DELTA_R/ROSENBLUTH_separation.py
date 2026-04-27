@@ -180,7 +180,7 @@ with PdfPages(pdf_output) as pp:
 
         ax.set_title(f"{num_longname}/{denom_longname} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {deltaR:.4f} ± {deltaR_err:.4f},"f"\t"r"$\sigma_A^T \backslash \sigma_D^T =$"f"{sig_t_ratio:.4f}"r" $\pm$"f"{sig_t_ratio_err:.4f}", fontsize=10)
         ax.set_xlabel(r"$\epsilon$'")
-        ax.set_ylabel(r"$ \sigma_A / \sigma_D$")
+        ax.set_ylabel(rf"$\sigma_{{{num_shortname}}} / \sigma_{{{denom_shortname}}}$")
         
         ax.legend(fontsize=8)
         ax.grid(True)

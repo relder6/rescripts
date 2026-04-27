@@ -31,20 +31,20 @@ target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_tar
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0"
+rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0p1"
 mc_dir = "/work/hallc/c-rsidis/relder/mc-single-arm"
-input_settings_filepath = f"../../FILTER_type/{target_shortname.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_runs.dat"
-output_dir = f"{target_shortname.upper()}"
+input_settings_filepath = f"../../FILTER_type/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.dat"
+output_dir = f"{target_abbrev.upper()}"
 
 # -----------------------------------------------------
 # Reading in monte-carlo report to obtain normfac
 # -----------------------------------------------------
-if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
-    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_{target_shortname.lower()}.root"
+if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
+    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev.lower()}.root"
     if not os.path.exists(mc_filepath):
         print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Exiting...")
         exit(1)
-    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_{target_shortname.lower()}.out"
+    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev.lower()}.out"
     with open(mc_report_filepath, "r") as infile:
         normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
     normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
@@ -175,7 +175,7 @@ for i, runnum in enumerate(runnums):
      for var, bins in custom_bins.items():
          axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
 
-         if target_shortname == "dummy":
+         if target_abbrev == "dummy":
 
              hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
              hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
@@ -242,7 +242,7 @@ for i, runnum in enumerate(runnums):
 # -----------------------------------------------------
 # Monte carlo histogram and csv creation
 # -----------------------------------------------------
-if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
     mc_file = uproot.open(mc_filepath)
     mc_tree = mc_file["h10"]
     df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
@@ -263,21 +263,21 @@ if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
 for var, bins in custom_bins.items():
     mc_var = None
     
-    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
         mc_var = variable_mc_map.get(var)
         
-    if mc_var is None or target_shortname in {"dummy", "optics1", "optics2", "hole"}:
+    if mc_var is None or target_abbrev in {"dummy", "optics1", "optics2", "hole"}:
         continue
     
     axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"])
-    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
         hist_mc = bh.Histogram(axis, storage=bh.storage.Weight())
 
         if "weight" in df_mc_cut.columns:
             delta_temp = df_mc_cut["hsdelta"].values
             deltacorr = 1.0
 
-            if target_shortname in {"al", "c", "cu"}:
+            if target_abbrev in {"al", "c", "cu"}:
                 # Determined only with carbon,
                 a = 1.012441e+00
                 b = 3.055522e-03
@@ -287,7 +287,7 @@ for var, bins in custom_bins.items():
 
                 deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
 
-            elif target_shortname in {"ld2", "lh2", "dummy"}:
+            elif target_abbrev in {"ld2", "lh2", "dummy"}:
                 a = 1.011192e+00
                 b = 5.168480e-03
                 c = -1.104189e-03
@@ -330,22 +330,22 @@ for var, rows in hist_data.items():
 
     # Saving here for counts
     hist_df = pd.DataFrame(rows, columns=columns)
-    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
         mc_row = ["MC", "0", "mc"] + mc_hist_data[var]
         hist_df = pd.concat([pd.DataFrame([mc_row], columns=columns), hist_df], ignore_index = True)
     
-    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_{var}_histo.csv"
+    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_{var}_histo.csv"
     output_filepath = f"{output_dir}/{output_filename}"
     hist_df.to_csv(output_filepath, index=False)
 
     # Saving here for error bars
     hist_err_df = pd.DataFrame(hist_err_data[var], columns=columns)
-    if target_shortname not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
         mc_err_row = ["MC", "0", "0"] + mc_hist_err[var]
         hist_err_df = pd.concat([pd.DataFrame([mc_err_row], columns=columns), hist_err_df], ignore_index=True)
     
-    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_shortname}_{var}_err.csv"
+    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_{var}_err.csv"
     output_err_filepath = f"{output_dir}/{output_err_filename}"
     hist_err_df.to_csv(output_err_filepath, index=False)
     
-print(f"Saved output CSV files to {target_shortname.upper()}/ folder.")
+print(f"Saved output CSV files to {target_abbrev.upper()}/ folder.")

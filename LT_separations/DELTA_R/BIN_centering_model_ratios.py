@@ -18,6 +18,8 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bin
 # -----------------------------------------------------
 # Handling user inputs, listing directories
 # -----------------------------------------------------
+R_ld2 = 0.2557798343632005
+
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
@@ -344,8 +346,6 @@ df_data["bc_corr"] = ((df_data["bc_xsec_model_num"] / df_data["bc_xsec_model_den
 m_p = 0.93827208943 # proton mass, GeV
 
 alpha = 1 / 137.035999177 # fine structure constant
-
-R_ld2 = 0.26577787453885426
 
 df_data["theta_rad"] = np.deg2rad(df_data["theta"])
 
