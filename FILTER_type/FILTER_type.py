@@ -6,21 +6,29 @@ import numpy as np
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import parse_run_type, parse_beam_pass, parse_target
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_flags
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-USING_CURRENT_OFFSET = True
-USING_BOIL_CORR = True
+flags = get_flags()
 
-skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,
+USING_CURRENT_OFFSET = flags["USING_CURRENT_OFFSET"]
+USING_BOIL_CORR = flags["USING_BOIL_CORR"]
+USING_CURRENT_CUT = flags["USING_CURRENT_CUT"]
+
+if USING_CURRENT_CUT:
+    current_cut = 10.0
+else:
+    current_cut = 0.0
+
+skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
                 #Now skipping the low current (< 10 uA) runs,
                 # 23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
                 # 24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
                 # 24498,24911,24967,25047,25081,25406,25407,25416,25417,
                 #Now skipping some runs that have negative yields (?!),
-                25396, 25397]
+                # 25396, 25397]
 
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
@@ -31,7 +39,7 @@ selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
 
 bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
-output_filepath = f"{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.dat"
+output_filepath = f"{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.csv"
 
 # -----------------------------------------------------
 # Bigtable look-up
@@ -76,6 +84,14 @@ if os.path.exists(bigtable_filepath):
                     target_abbrev.lower() == target.strip().lower() and
                     ebeam.startswith(beam_prefix) and
                     runnum not in skip_runnums):
+
+                    if ibeam in ["N/A", ""]:
+                        continue
+                    try:
+                        if float(ibeam) < current_cut:
+                            continue
+                    except (ValueError, TypeError):
+                        continue
 
                     ps3_val, ps4_val = float(ps3), float(ps4)
 

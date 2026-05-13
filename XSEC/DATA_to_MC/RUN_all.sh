@@ -9,7 +9,6 @@ script_path="./DATA_to_MC.py"
 for run_type in "${run_types[@]}"; do
     for beam_pass in "${beam_passes[@]}"; do
         for target in "${targets[@]}"; do
-            echo
             echo "****************************************************"    
             echo "Running $run_type at ${beam_pass}pass on $target"    
             "$script_path" "$run_type" "$beam_pass" "$target"
