@@ -3,18 +3,14 @@
 import pandas as pd
 import os, re, sys
 
-ratio_directory = "../XSEC/FORM_xsec"
+ratio_directory = "../XSEC/FORM_xsec/RATIOS"
 
-csv_files = [f"{ratio_directory}/AL/XSEC_hmsdis_4pass_al.csv",
-             f"{ratio_directory}/AL/XSEC_hmsdis_5pass_al.csv",
-             f"{ratio_directory}/C/XSEC_hmsdis_4pass_c.csv",
-             f"{ratio_directory}/C/XSEC_hmsdis_5pass_c.csv",
-             f"{ratio_directory}/CU/XSEC_hmsdis_4pass_cu.csv",
-             f"{ratio_directory}/CU/XSEC_hmsdis_5pass_cu.csv",
-             f"{ratio_directory}/LD2/XSEC_hmsdis_4pass_ld2.csv",
-             f"{ratio_directory}/LD2/XSEC_hmsdis_5pass_ld2.csv",
-             f"{ratio_directory}/LH2/XSEC_hmsdis_4pass_lh2.csv",
-             f"{ratio_directory}/LH2/XSEC_hmsdis_5pass_lh2.csv"]
+csv_files = [f"{ratio_directory}/XSEC_RATIO_hmsdis_4pass_al_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_al_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_4pass_c_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_c_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_4pass_cu_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_cu_to_ld2.csv",]
 
 all_rows = []
 
@@ -43,9 +39,9 @@ for filepath in csv_files:
     df["ebeam"] = ebeam
     df["q2"] = df["q2"]
     df["w2"] = df["w"] ** 2
-    df["xsec_model"] = df["modelxsec"]
+    df["xsec_ratio_model"] = df["modelxsec_num"] / df["modelxsec_denom"]
 
-    df_out = df[["exp", "target", "A", "Z","ebeam","eprime","theta","xbj", "q2", "w2", "epsilon","xsec_exp", "xsec_exp_err", "xsec_model"]]
+    df_out = df[["exp", "target_num", "A_num", "Z_num", "ebeam","eprime","theta","xbj", "q2", "w2", "epsilon","xsec_ratio_model", "xsec_ratio", "xsec_ratio_err", "xsec_ratio_per_nucleon", "xsec_ratio_per_nucleon_err"]]
 
     df_out = df_out.dropna()
 
@@ -53,7 +49,7 @@ for filepath in csv_files:
 
 df_all = pd.concat(all_rows, ignore_index=True)
 
-output_csv = "CSVs/RME_xsec_results.csv"
+output_csv = "CSVs/RME_xsec_ratio_results.csv"
 
 df_all.to_csv(output_csv, index=False)
 

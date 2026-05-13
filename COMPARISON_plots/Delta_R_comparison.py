@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-import os
-import csv
+import os, csv
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.colors import to_rgba

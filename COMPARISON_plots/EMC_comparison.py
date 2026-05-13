@@ -6,12 +6,13 @@ import csv
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 from datetime import datetime
+import mplhep
 
 # ----------------------------------------------
 # CSV files
 # ----------------------------------------------
-csv_files = ["CSVs/RME_emc_results.csv", "CSVs/WorldData.csv", "CSVs/DG_emc.csv"]
-
+csv_files = ["CSVs/RME_emc_results.csv", "CSVs/WorldData.csv",]
+#  "CSVs/DG_emc.csv"
 # ----------------------------------------------
 # Target definitions, mapping, selection
 # ----------------------------------------------
@@ -90,8 +91,19 @@ unique_sources = sorted({d["source"] for d in filtered_data})
 # ----------------------------------------------
 # Plotting
 # ----------------------------------------------
-fig, ax = plt.subplots(figsize=(7,5))
-plt.subplots_adjust(bottom=0.18, left=0.18)
+plt.style.use(mplhep.style.ROOT)
+
+plt.rcParams.update({"font.family": "DejaVu Sans",
+                     "mathtext.fontset": "dejavusans",
+                     "mathtext.default": "regular",
+                     "figure.titlesize": 14,
+                     "axes.titlesize": 16,
+                     "axes.labelsize": 14,
+                     "legend.fontsize": 12,
+                     "xtick.labelsize": 12,
+                     "ytick.labelsize": 12,})
+fig, ax = plt.subplots(figsize=(6.5,5))
+# plt.subplots_adjust(bottom=0.18, left=0.18)
 
 marker_cycle = ['o', 's', '^', 'v', 'P', 'X', '*', '<', '>']
 source_to_marker = {src: ("D" if src=="RME_results.csv" else marker_cycle.pop(0)) for src in unique_sources}
@@ -118,7 +130,7 @@ for exp, points_all in experiments.items():
         ax.errorbar(x, y, yerr=yerr, fmt=source_to_marker[src], linestyle='none',
                     markersize=ms, capsize=0, markerfacecolor='none', markeredgewidth=1.1,
                     color=color, label=exp)
-
+ax.set_title(f"EMC Ratios: {target_symbol}/LD2")
 ax.set_xlabel(r"$x_{bj}$", fontsize = 14)
 ax.set_ylabel(rf"$(\sigma_{{{target_symbol}}} \, / \, {A_nominal}) \: / \: (\sigma_D \, / \, 2)$", fontsize=14)
 ax.legend()

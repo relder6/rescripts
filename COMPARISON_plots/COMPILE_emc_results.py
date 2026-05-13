@@ -8,11 +8,13 @@ ratio_directory = "../XSEC/FORM_xsec/RATIOS"
 csv_files = [f"{ratio_directory}/XSEC_RATIO_hmsdis_4pass_c_to_ld2.csv",
              f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_c_to_ld2.csv",
              f"{ratio_directory}/XSEC_RATIO_hmsdis_4pass_cu_to_ld2.csv",
-             f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_cu_to_ld2.csv"]
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_cu_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_4pass_al_to_ld2.csv",
+             f"{ratio_directory}/XSEC_RATIO_hmsdis_5pass_al_to_ld2.csv"]
 
 all_rows = []
 
-# A_num,Z_num,eprime,theta,xbj,q2,w,epsilon,modelxsec_num,xsec_exp_num,xsec_exp_err_num,A_denom,Z_denom,modelxsec_denom,xsec_exp_denom,xsec_exp_err_denom,xsec_ratio,xsec_ratio_err,xsec_ratio_norm,xsec_ratio_norm_err,f2rat,iso_corr,xsec_ratio_final,xsec_ratio_final_err
+# A_num,Z_num,eprime,theta,xbj,q2,w,epsilon,modelxsec_num,xsec_exp_num,xsec_exp_err_num,A_denom,Z_denom,modelxsec_denom,xsec_exp_denom,xsec_exp_err_denom,xsec_ratio,xsec_ratio_err,xsec_ratio_norm,xsec_ratio_norm_err,f2rat,iso_corr,xsec_ratio_per_nucleon,xsec_ratio_per_nucleon_err
 
 for filepath in csv_files:
     if not os.path.exists(filepath):
@@ -32,13 +34,11 @@ for filepath in csv_files:
     df["A"] = df["A_num"]
     df["Z"] = df["Z_num"]
     df["w2"] = df["w"] ** 2
-    df["ratio_raw"] = df["xsec_ratio"]
-    df["ratio_norm"] = df["xsec_ratio_norm"]
-    df["emc_ratio"] = df["xsec_ratio_final"]
-    df["emc_ratio_err"] = df["xsec_ratio_final_err"]
+    df["emc_ratio"] = df["xsec_ratio_per_nucleon"]
+    df["emc_ratio_err"] = df["xsec_ratio_per_nucleon_err"]
     
 
-    df_out = df[["exp", "A", "Z", "xbj", "q2", "w2", "epsilon", "eprime", "theta", "xsec_exp_num", "xsec_exp_denom", "ratio_raw", "ratio_norm", "iso_corr", "emc_ratio", "emc_ratio_err"]]
+    df_out = df[["exp", "A", "Z", "xbj", "q2", "w2", "epsilon", "eprime", "theta", "xsec_exp_num", "xsec_exp_denom", "iso_corr", "emc_ratio", "emc_ratio_err"]]
 
     df_out = df_out.dropna()
 

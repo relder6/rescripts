@@ -8,7 +8,8 @@ R_directory = "../LT_separations/NUCLEAR_R/CSVs"
 csv_files = [f"{R_directory}/HMSDIS_rosenbluth_fit_c.csv",
              f"{R_directory}/HMSDIS_rosenbluth_fit_cu.csv",
              f"{R_directory}/HMSDIS_rosenbluth_fit_ld2.csv",
-             f"{R_directory}/HMSDIS_rosenbluth_fit_lh2.csv"]
+             f"{R_directory}/HMSDIS_rosenbluth_fit_lh2.csv",
+             f"{R_directory}/HMSDIS_rosenbluth_fit_al.csv"]
 
 all_rows = []
 
