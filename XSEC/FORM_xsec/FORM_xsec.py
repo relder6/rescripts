@@ -62,13 +62,14 @@ df_merged["xsec_exp_err"] = df_merged["xsec_exp_err"].replace([np.inf, -np.inf],
 
 df_merged["A"] = target_A
 df_merged["Z"] = target_Z
+df_merged["target"] = target_longname
 
 output_dir = f"{target_abbrev.upper()}"
 os.makedirs(output_dir, exist_ok=True)
 
 output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}.csv"
 
-final_columns = ["A", "Z", "eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
+final_columns = ["target", "A", "Z", "eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
 
 df_final = df_merged[final_columns]
 

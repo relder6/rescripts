@@ -14,11 +14,12 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_data_cuts, get_common_values
 from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
+import mplhep
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
 # -----------------------------------------------------
-R_ld2 = 0.2557798343632005
+R_ld2 = 0.23917591490972823
 
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
@@ -357,22 +358,18 @@ df_data["bc_epsilon_p"] = df_data["bc_epsilon"] / ( 1 + df_data["bc_epsilon"] * 
 
 df_data["bc_gamma"] = alpha / (2 * np.pi**2 * df_data["bc_q2"]) * (df_data["ebeam"] - df_data["bc_nu"]) / (df_data["ebeam"]) * (df_data["bc_nu"] * (1 - df_data["bc_xbj"])) / (1 - df_data["bc_epsilon"])
 
-df_data["sigma_num_to_sigma_denom"] = df_data["xsec_ratio"]
+df_data["bc_xsec_ratio"] = df_data["xsec_ratio"] * df_data["bc_corr"]
 
-df_data["sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_err"]
-
-df_data["bc_sigma_num_to_sigma_denom"] = df_data["xsec_ratio"] * df_data["bc_corr"]
-
-df_data["bc_sigma_num_to_sigma_denom_err"] = df_data["xsec_ratio_err"] * df_data["bc_corr"]
+df_data["bc_xsec_ratio_err"] = df_data["xsec_ratio_err"] * df_data["bc_corr"]
 
 df_data["epsilon_p"] = df_data["epsilon"] / (1 + df_data["epsilon"] * R_ld2)
 
 col_final = ["setting", "num_A", "num_Z", "denom_A", "denom_Z", "ebeam", "theta", "theta_rad", "eprime", "xbj",
              "q2", "w2", "epsilon", "epsilon_p", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
-             "xsec_ratio", "xsec_ratio_err", "sigma_num_to_sigma_denom", "sigma_num_to_sigma_denom_err",
+             "xsec_ratio", "xsec_ratio_err",
              "bin_num", "bc_xsec_model_num", "bc_xsec_model_denom", "bc_corr",
              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
-             "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err"]
+             "bc_xsec_ratio", "bc_xsec_ratio_err"]
 
 df_final = df_data[col_final]
 
@@ -428,32 +425,44 @@ print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].
 # -----------------------------------------------------
 # Plotting
 # -----------------------------------------------------
-plt.figure()
+plt.style.use(mplhep.style.ROOT)
+
+plt.rcParams.update({"font.family": "DejaVu Sans",
+                     "mathtext.fontset": "dejavusans",
+                     "mathtext.default": "regular",
+                     "figure.titlesize": 13,
+                     "axes.titlesize": 13,
+                     "axes.labelsize": 12,
+                     "legend.fontsize": 12,
+                     "xtick.labelsize": 12,
+                     "ytick.labelsize": 12,})
+
+fig, ax = plt.subplots(figsize=(6.5, 5),constrained_layout=True)
 
 unique_bins = sorted(df_data["bin_num"].unique())
 
 if nbins != 1:
-    plt.axvspan(overlap_min, overlap_max, color="lightskyblue", alpha=0.1, label="Overlap Region")
+    ax.axvspan(overlap_min, overlap_max, color="lightgrey", alpha=0.1, label="Overlap Region")
 else:
-    plt.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
+    ax.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
 
-plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*",label="Bin centers", s=64)
+plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*", color = "red", label="Bin centers", s=64)
 
 for bin_num in unique_bins:
     mask = df_data["bin_num"] == bin_num
-    plt.scatter(df_data.loc[mask, "xbj"],df_data.loc[mask, "q2"], label=f"Bin {bin_num}", s=12)
+    ax.scatter(df_data.loc[mask, "xbj"],df_data.loc[mask, "q2"], color = "navy", label=f"Bin {bin_num}", s=12)
 
 for i in range(1, len(edges)-1):
     if i == 1:
-        plt.axvline(edges[i], ls="--", color="red", alpha=0.8, label="Bin Edges")
+        ax.axvline(edges[i], ls="--", color="black", alpha=0.8, label="Bin Edges")
     else:
-        plt.axvline(edges[i], ls="--", color="red", alpha=0.8)
+        ax.axvline(edges[i], ls="--", color="black", alpha=0.8)
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{num_longname}/{denom_longname} Binning Test (nbins={nbins})")
+plt.title(f"{num_longname}/{denom_longname} Bin Centering Kinematics (nbins={nbins})")
 
-plt.legend()
+plt.legend(loc="upper left", frameon = True, fancybox = True, framealpha=0.6,edgecolor="gray")
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
 plt.savefig(f"PNGs/{selected_run_type}_{num_abbrev}_to_{denom_abbrev}_binning_test.png")

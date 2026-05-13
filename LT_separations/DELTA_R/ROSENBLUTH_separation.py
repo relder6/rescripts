@@ -12,6 +12,7 @@ if BASE_DIR not in sys.path:
 from INIT.config import get_data_cuts, get_common_values
 from scipy.optimize import curve_fit
 from collections import defaultdict
+import mplhep
 from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
 
 # -----------------------------------------------------
@@ -55,8 +56,8 @@ pp = PdfPages(pdf_output)
 # -----------------------------------------------------
 df = pd.read_csv(bc_csv)
 
-required_cols = ["bin_num", "xbj", "q2", "epsilon_p", "sigma_num_to_sigma_denom", "sigma_num_to_sigma_denom_err",
-                 "bc_xbj", "bc_q2", "bc_epsilon_p", "bc_sigma_num_to_sigma_denom", "bc_sigma_num_to_sigma_denom_err",]
+required_cols = ["bin_num", "xbj", "q2", "epsilon_p", "xsec_ratio", "xsec_ratio_err",
+                 "bc_xbj", "bc_q2", "bc_epsilon_p", "bc_xsec_ratio", "bc_xsec_ratio_err",]
 
 missing = [c for c in required_cols if c not in df.columns]
 
@@ -72,14 +73,14 @@ data = {}
 for bin_num, sub in df.groupby("bin_num"):
     
     bc_data[bin_num] = {"epsilon_p": sub["bc_epsilon_p"].to_numpy(),
-                        "xsec_ratio": sub["bc_sigma_num_to_sigma_denom"].to_numpy(),
-                        "xsec_ratio_err": sub["bc_sigma_num_to_sigma_denom_err"].to_numpy(),
+                        "xsec_ratio": sub["bc_xsec_ratio"].to_numpy(),
+                        "xsec_ratio_err": sub["bc_xsec_ratio_err"].to_numpy(),
                         "xbj": sub["bc_xbj"].to_numpy(),
                         "q2": sub["bc_q2"].to_numpy(),}
     
     data[bin_num] = {"epsilon_p": sub["epsilon_p"].to_numpy(),
-                     "xsec_ratio": sub["sigma_num_to_sigma_denom"].to_numpy(),
-                     "xsec_ratio_err": sub["sigma_num_to_sigma_denom_err"].to_numpy(),
+                     "xsec_ratio": sub["xsec_ratio"].to_numpy(),
+                     "xsec_ratio_err": sub["xsec_ratio_err"].to_numpy(),
                      "xbj": sub["xbj"].to_numpy(),
                      "q2": sub["q2"].to_numpy(),}
 
@@ -91,6 +92,19 @@ def modified_linear_fit(x, sig_t_ratio, deltaR):
 
 fit_results = []
 epsp_rows = []
+
+plt.style.use(mplhep.style.ROOT)
+plt.rcParams.update({
+    "font.family": "DejaVu Sans",
+    "mathtext.fontset": "dejavusans",
+    "mathtext.default": "regular",
+    "figure.titlesize": 14,
+    "axes.titlesize": 14,
+    "axes.labelsize": 12,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+})
 
 with PdfPages(pdf_output) as pp:
     for bin_num in sorted(bc_data.keys()):
@@ -155,34 +169,68 @@ with PdfPages(pdf_output) as pp:
                             "sigma_t_ratio": sig_t_ratio,
                             "sigma_t_ratio_err": sig_t_ratio_err})
 
-        fig, ax = plt.subplots(figsize = (6, 5))
+        fig, ax = plt.subplots(figsize = (6.5, 5))
 
-        ax.errorbar(epsp_raw, ratio_raw, yerr = ratio_err_raw, fmt = "o", color = "gray", alpha = 0.4, markersize = 3, label = "pre bin-centering")
+        ax.errorbar(epsp_raw, ratio_raw, yerr = ratio_err_raw, fmt = "o", color = "gray", alpha = 0.4, markersize = 3, label = "Raw")
 
-        ax.errorbar(epsp_bc, ratio_bc, yerr = ratio_err_bc, fmt = "o", color = "navy", alpha = 0.8, markersize = 3,label = "bin-centered points")
+        ax.errorbar(epsp_bc, ratio_bc, yerr = ratio_err_bc, fmt = "o", color = "navy", alpha = 0.8, markersize = 3,label = "Bin-centered")
 
-        ax.errorbar(epsp_comb, rat_comb, yerr = rat_err_comb, fmt = "o", color = "red", markersize = 5,label = "weighted avg per ε'")
+        ax.errorbar(epsp_comb, rat_comb, yerr = rat_err_comb, fmt = "o", color = "red", markersize = 5,label = r"Weighted avg at $\varepsilon ' $", zorder=10)
 
         epsp_min = min(epsp_raw.min(), epsp_bc.min(), epsp_comb.min())
         epsp_max = max(epsp_raw.max(), epsp_bc.max(), epsp_comb.max())
         x_fit = np.linspace(epsp_min, epsp_max, 200)
         y_fit = modified_linear_fit(x_fit, sig_t_ratio, deltaR)
-        ax.plot(x_fit, y_fit, "--", color="red",label=(r"Modified Linear Fit: $\frac{\sigma_A}{\sigma_D} = \frac{\sigma_A^T}{\sigma_D^T} \left(1 + \Delta R \epsilon' \right)$"f"\n"f"(includes est. {syst_err} syst. err.)"))
-        
+        ax.plot(x_fit,y_fit,"--",color="red",label=(rf"Fit: "
+                                                    rf"$\sigma_{{{num_shortname}}} / \sigma_{{{denom_shortname}}}"
+                                                    rf" = \sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T"
+                                                    rf"\left(1 + \Delta R \,\epsilon' \right)$"),)
+        # ax.plot(x_fit,y_fit,"--",color="red",label=(f"Fit Results:\n"
+        #                                             rf"$\sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T"
+        #                                             rf" = {sig_t_ratio:.3f} \pm {sig_t_ratio_err:.3f}$"
+        #                                             f"\n"
+        #                                             rf"$\Delta R = {deltaR:.3f} \pm {deltaR_err:.3f}$"),)
+        # ax.plot(x_fit, y_fit, "--", color = "red", label = "Rosenbluth fit", zorder = 11)
         all_rat = np.concatenate([ratio_raw, ratio_bc, rat_comb])
                 
         y_min, y_max = all_rat.min(), all_rat.max()
                 
-        margin = 0.1
-        dy = margin * (y_max - y_min if y_max > y_min else 1.0)
-        ax.set_xlim(epsp_min - 0.05, epsp_max + 0.05)
-        ax.set_ylim(y_min - dy, y_max + dy)
+        # margin = 0.1
+        # dy = margin * (y_max - y_min if y_max > y_min else 1.0)
+        # ax.set_xlim(epsp_min - 0.05, epsp_max + 0.05)
+        # ax.set_ylim(y_min - dy, y_max + dy)
 
-        ax.set_title(f"{num_longname}/{denom_longname} Rosenbluth Separation\n"r"x$_{bj}$="f"{xbjavg:.3f}, Q"r"$^2$"f"={q2avg:.3f} ± {q2_err:.3f}\n $\Delta$R = {deltaR:.4f} ± {deltaR_err:.4f},"f"\t"r"$\sigma_A^T \backslash \sigma_D^T =$"f"{sig_t_ratio:.4f}"r" $\pm$"f"{sig_t_ratio_err:.4f}", fontsize=10)
+        # ax.set_title(
+        #     rf"Rosenbluth Separation of $\Delta R = R_{{{num_shortname}}} - R_{{{denom_shortname}}}$ "
+        #     f"($x_{{bj}} = {xbjavg:.3f},\ Q^2 = {q2avg:.3f}$)"
+        #     f"\n$\Delta R = {deltaR:.3f} \pm {deltaR_err:.3f}$\t\t"
+        #     rf"$\sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T = {sig_t_ratio:.3f} \pm {sig_t_ratio_err:.3f}$",)
+        ax.set_title(
+            rf"Rosenbluth Separation of $\Delta R = R_{{{num_shortname}}} - R_{{{denom_shortname}}}$ "
+            f"\n$x_{{bj}} = {xbjavg:.3f},\ Q^2 = {q2avg:.3f}$",)
         ax.set_xlabel(r"$\epsilon$'")
         ax.set_ylabel(rf"$\sigma_{{{num_shortname}}} / \sigma_{{{denom_shortname}}}$")
         
-        ax.legend(fontsize=8)
+        # plt.legend(loc="upper center", frameon = True, fancybox = True, framealpha=0.6,edgecolor="gray")
+
+        from matplotlib.lines import Line2D
+
+        handles, labels = ax.get_legend_handles_labels()
+
+        handles.extend([
+            Line2D([], [], linestyle="none", color="none"),
+            Line2D([], [], linestyle="none", color="none"),
+            Line2D([], [], linestyle="none", color="none"),
+        ])
+
+        labels.extend([
+            r"$\mathbf{Fit\ Results}$",
+            rf"$\sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T = {sig_t_ratio:.3f} \pm {sig_t_ratio_err:.3f}$",
+            rf"$\Delta R   = {deltaR:.3f} \pm {deltaR_err:.3f}$",
+        ])
+
+        ax.legend(handles, labels, loc="upper center",
+                  frameon=True, fancybox=True, framealpha=0.6, edgecolor="gray")
         ax.grid(True)
 
         pp.savefig(fig)
