@@ -20,19 +20,27 @@ polarity_mask = data["polarity"] == "-"
 
 # runnum_mask = np.isin(data["runnum"], [24303, 24304, 24306, 24307, 24308, 24309])
 
-runnum_mask = np.isin(data["runnum"], [24284,24285,24286,24287,24289,24290,24291,24292,24293,24294,24295,24296,24297,24298,24299])
+runnum_mask = ~np.isin(data["runnum"], [24284,24285,24286,24287,24289,24290,24291,24292,24293,24294,24295,24296,24297,24298,24299])
 
 targ_mask = np.isin(data["target"], ["cu", "c", "lh2", "ld2"])
 
-pass_mask = np.isin(data["beampass"], ["4Pass", "5Pass"])
+pass_mask = np.isin(data["beampass"], [4, 5])
 
-current_mask = (data["current"] > 5) & (data["current"] < 100)
+current_mask = (data["ibeam"] > 5) & (data["ibeam"] < 100)
 
 mask = polarity_mask & runnum_mask & current_mask & targ_mask & pass_mask
 
+print("total               ", len(data))
+print("polarity            ", np.sum(polarity_mask))
+print("runnum              ", np.sum(runnum_mask))
+print("current             ", np.sum(current_mask))
+print("target              ", np.sum(targ_mask))
+print("pass                ", np.sum(pass_mask))
+print("all cuts            ", np.sum(mask))
+
 current_offset = float(input("Input current offset to test: "))
 
-I = data["current"][mask]
+I = data["ibeam"][mask]
 
 yield_norm = data["yield"][mask]
 

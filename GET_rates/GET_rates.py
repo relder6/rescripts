@@ -9,10 +9,10 @@ import csv
 # =====================================================================
 
 input_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_runlist.dat" # The location of the auxfiles runlist
-hms_report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
-shms_report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/SHMS/PRODUCTION/replay_shms_coin_production_{runnum}_-1.report"
-coin_report_filepath = "/work/hallc/c-rsidis/replay/pass0/REPORT_OUTPUT/COIN/PRODUCTION/replay_coin_production_{runnum}_-1.report"
-run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0.csv"
+hms_report_filepath = "/work/hallc/c-rsidis/replay/pass0p1/REPORT_OUTPUT/HMS/PRODUCTION/replay_hms_coin_production_{runnum}_-1.report"
+shms_report_filepath = "/work/hallc/c-rsidis/replay/pass0p1/REPORT_OUTPUT/SHMS/PRODUCTION/replay_shms_coin_production_{runnum}_-1.report"
+coin_report_filepath = "/work/hallc/c-rsidis/replay/pass0p1/REPORT_OUTPUT/COIN/PRODUCTION/replay_coin_production_{runnum}_-1.report"
+run_info_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
 
 skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860, 24482, 24496, 25013]
 # Runs 23853 - 23860 are commissioning runs; skipping these for now

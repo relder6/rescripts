@@ -26,7 +26,9 @@ def get_common_values():
     return {"ebeam_4pass": 8.5831,
             "ebeam_5pass": 10.6716,
             "angle_4pass": 29.045,
-            "angle_5pass": 16.75}
+            "angle_5pass": 16.75,
+            "ebeam_3pass_phaseII": 6.449,
+            "angle_3pass_phaseII": 31.278}
 
 # ---------------------------------------------------------------------
 # User Input Processing Logic
