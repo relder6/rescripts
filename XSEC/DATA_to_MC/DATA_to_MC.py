@@ -41,7 +41,7 @@ pp = PdfPages(pdf_output)
 # -----------------------------------------------------
 # Loop over variables and produce figures for ALL targets
 # -----------------------------------------------------
-if target_abbrev in {"al", "c", "cu", "ld2", "lh2"}:
+if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
     ordered_variables = ["H_gtr_dp"] + [v for v in variables if v != "H_gtr_dp"]
     if target_abbrev in {"ld2", "lh2"}:
         dummy_dir = f"../MAKE_csvs/DUMMY"
@@ -144,7 +144,7 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2"}:
                 err_pos_dummy  = np.sqrt(np.sum(df_err_dummy.loc[pos_mask_dummy , bin_cols_dummy].astype(float).values**2, axis=0))                      
             
         # Positron and Dummy Subtraction
-        if target_abbrev in {"al", "c", "cu"}:
+        if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
             yield_sub = yield_neg - yield_pos
             err_sub   = np.sqrt(err_neg**2 + err_pos**2)
         if target_abbrev in {"ld2", "lh2"}:

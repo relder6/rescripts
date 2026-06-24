@@ -134,7 +134,9 @@ def parse_target(selected_target):
                                                    "cu": "cu", "copper": "cu",
                                                    "ld2": "ld2", "d2": "ld2", "deuterium": "ld2",
                                                    "lh2": "lh2", "h2": "lh2", "hydrogen": "lh2",
-                                                   "dummy": "dummy"}
+                                                   "dummy": "dummy",
+                                                   "dummy_up": "dummy_up", "up": "dummy_up",
+                                                   "dummy_down": "dummy_down", "down": "dummy_down"}
     target_abbrev = selected_target_shortcut_to_target_variable.get(selected_target)
     if not target_abbrev:
         raise ValueError(f"Unknown target: {selected_target}")
@@ -144,7 +146,9 @@ def parse_target(selected_target):
                    "cu": ("Copper", "Cu", 64, 29),
                    "ld2": ("Deuterium", "LD2", 2, 1),
                    "lh2": ("Hydrogen", "LH2", 1, 1),
-                   "dummy": ("Dummy", "Dummy", 0, 0)}
+                   "dummy": ("Dummy", "Dummy", 0, 0),
+                   "dummy_up": ("Dummy_Upstream", "Dummy_Up", 27, 13),
+                   "dummy_down": ("Dummy_Downstream", "Dummy_Down", 27, 13)}
     target_longname, target_shortname, target_A, target_Z = target_info[target_abbrev]
     return target_abbrev, target_longname, target_shortname, target_A, target_Z
 

@@ -121,6 +121,11 @@ if os.path.exists(bigtable_filepath):
 
                     weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
 
+                    if runnum <= 27100:
+                        phase = "I"
+                    elif runnum > 27100:
+                        phase = "II"
+
                     bigtable_lookup[runnum] = {"run_type": run_type,
                                                "start_time": start_time,
                                                "stop_time": stop_time,
@@ -142,7 +147,8 @@ if os.path.exists(bigtable_filepath):
                                                "nu": nu,
                                                "q2": q2,
                                                "epsilon": epsilon,
-                                               "weight": weight}
+                                               "weight": weight,
+                                               "phase": phase}
             except (ValueError, KeyError):
                 continue
                                

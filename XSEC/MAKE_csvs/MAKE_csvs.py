@@ -35,7 +35,10 @@ target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_tar
 # -----------------------------------------------------
 rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0p1"
 mc_dir = "/work/hallc/c-rsidis/relder/mc-single-arm"
-input_settings_filepath = f"../../FILTER_type/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.csv"
+if target_abbrev not in {"dummy_up", "dummy_down"}:
+    input_settings_filepath = f"../../FILTER_type/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.csv"
+else:
+    input_settings_filepath = f"../../FILTER_type/DUMMY/{selected_run_type}_{selected_beam_pass}pass_dummy_runs.csv"
 output_dir = f"{target_abbrev.upper()}"
 
 # -----------------------------------------------------
@@ -168,9 +171,20 @@ for i, runnum in enumerate(runnums):
      tree = uproot.open(rootfile_path)["T"]
      arr = tree.arrays(branches, library = "np")
      df = pd.DataFrame(arr)
-     data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                 (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
-                 (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]))
+     if target_abbrev not in {"dummy_up", "dummy_down"}:
+         data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                     (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
+                     (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]))
+     elif target_abbrev == "dummy_up":
+         data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                     (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
+                     (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]) &
+                     (df["H_gtr_y"] < 0))
+     elif target_abbrev == "dummy_down":
+         data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                     (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
+                     (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]) &
+                     (df["H_gtr_y"] >= 0))
      df_cut = df[data_cut].copy()
 
      run_weight = float(weight[i])
@@ -266,7 +280,7 @@ if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
 for var, bins in custom_bins.items():
     mc_var = None
     
-    if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
+    if target_abbrev not in {"optics1", "optics2", "hole"}:
         mc_var = variable_mc_map.get(var)
         
     if mc_var is None or target_abbrev in {"dummy", "optics1", "optics2", "hole"}:
@@ -280,7 +294,7 @@ for var, bins in custom_bins.items():
             delta_temp = df_mc_cut["hsdelta"].values
             deltacorr = 1.0
 
-            if target_abbrev in {"al", "c", "cu"}:
+            if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
                 # Determined only with carbon, OLD
                 a = 1.012441e+00
                 b = 3.055522e-03
