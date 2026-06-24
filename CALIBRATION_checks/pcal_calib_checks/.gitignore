@@ -1,7 +1,5 @@
-COIN/
-SHMS/
-*.dat
-*.png
-pass*/
-ERR_log/*
-DAT/*
+SHMSDIS
+ERR_log
+CSVs
+PI-SIDIS
+STABILITY_plots
