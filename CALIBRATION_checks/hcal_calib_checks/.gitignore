@@ -1,8 +1,9 @@
-COIN/
-HMS/
+HMSDIS
+PI+SIDIS
+PI-SIDIS
 *.dat
 *.png
-pass*/
-*.txt
-ERR_log/
-STABILITY_plots/
+*.csv
+ERR_log
+STABILITY_plots
+CSVs
