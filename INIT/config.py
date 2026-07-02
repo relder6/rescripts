@@ -99,6 +99,14 @@ def get_common_values():
 # ---------------------------------------------------------------------
 # User Input Processing Logic
 # ---------------------------------------------------------------------
+def parse_phase(phase):
+    if phase is None or phase.strip() == "":
+        phase = input("Enter desired run phase (I or II): ").strip()
+    phase = str(phase).strip().upper()
+    if not phase:
+        phase = "II"
+    return phase
+
 def parse_bins(nbins):
     if nbins is None or nbins.strip() == "":
         nbins = input("Indicate number of desired bins: ")
@@ -123,6 +131,27 @@ def parse_beam_pass(selected_beam_pass):
     if not beam_prefix:
         raise ValueError(f"Unknown pass: {selected_beam_pass}")
     return str(selected_beam_pass).strip(), beam_prefix
+
+def parse_setting(selected_beam_pass, phase):
+    def parse_beam_pass(selected_beam_pass):
+        selected_beam_pass_to_energy_prefix = {"1": "2.","2": "4.","3": "6.","4": "8.","5": "10."}
+        if selected_beam_pass is None or selected_beam_pass.strip() == "":
+            selected_beam_pass = input("Enter desired beam pass (present options: 1, 4, 5): ")
+            beam_prefix = selected_beam_pass_to_energy_prefix.get(str(selected_beam_pass).strip())
+        if not beam_prefix:
+            raise ValueError(f"Unknown pass: {selected_beam_pass}")
+        return str(selected_beam_pass).strip(), beam_prefix
+    def parse_phase(phase):
+        if phase is None or phase.strip() == "":
+            phase = input("Enter desired run phase (I or II): ").strip()
+        phase = str(phase).strip().upper()
+        if not phase:
+            phase = "II"
+        return phase
+    selected_setting = f"{selected_beam_pass}pass_phase{phase}"
+    return selected_setting
+    
+
 
 
 def parse_target(selected_target):

@@ -6,7 +6,7 @@ import numpy as np
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_flags
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_flags, parse_phase, parse_setting
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -33,14 +33,25 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
+phase = parse_phase(arg4)
+selected_setting = parse_setting(selected_beam_pass, phase)
 
-bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
-output_filepath = f"{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.csv"
+print(f"selected_run_type = {selected_run_type}")
+print(f"selected_beam_pass = {selected_beam_pass}")
+print(f"target = {target_longname}")
+print(f"run phase = {phase}")
+print(f"selected_setting = {selected_setting}")
 
+bigtable_filepaths = {"I": "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv",
+                      "II": "/lustre24/expphy/volatile/hallc/c-rsidis/relder/STUFF/rsidis_bigtable_phaseII.csv"}
+output_filepath = f"{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_setting}_{target_abbrev}.csv"
+
+bigtable_filepath = bigtable_filepaths[phase]
 # -----------------------------------------------------
 # Bigtable look-up
 # -----------------------------------------------------
@@ -56,9 +67,9 @@ if os.path.exists(bigtable_filepath):
                 target = row.get("target", "N/A")
                 ebeam = row.get("ebeam", "N/A")
                 ibeam = row.get("BCM2_I", "N/A")
-                ibeam1 = row.get("BCM1_I", "N/A")
-                ibeam4a = row.get("BCM4A_I", "N/A")
-                ibeam4c = row.get("BCM4C_I", "N/A")
+                # ibeam1 = row.get("BCM1_I", "N/A")
+                # ibeam4a = row.get("BCM4A_I", "N/A")
+                # ibeam4c = row.get("BCM4C_I", "N/A")
                 qbeam = row.get("BCM2_Q", "N/A")
                 hms_p = row.get("hms_p", "N/A")
                 hms_th = row.get("hms_th", "N/A")
@@ -66,9 +77,6 @@ if os.path.exists(bigtable_filepath):
                 ps4 = row.get("ps4", "N/A")
                 trackeff = row.get("h_esing_Eff", "N/A")
                 livetime = row.get("comp_livetime", "N/A")
-                fan_mean = row.get("fan_mean", "N/A")
-                start_time = row.get("start_time", "N/A")
-                stop_time = row.get("stop_time", "N/A")
 
                 # Being sure to only read out the boil_corr for liquid targets,
                 if target_abbrev in ["lh2", "ld2"]:
@@ -107,11 +115,13 @@ if os.path.exists(bigtable_filepath):
                     else:
                         print(f"Run {runnum} has no valid prescale (both -1), skipping...")
                         continue
-                    
+
+                    mp = 0.93827208943 #in GeV
                     nu = abs(float(ebeam)) - abs(float(hms_p))
                     hms_th_rad = np.deg2rad(float(hms_th))
                     q2 = 4 * abs(float((ebeam)) * abs(float(hms_p)) * (np.sin(hms_th_rad/2))**2)
                     epsilon = 1 / (1 + 2 * (1 + (nu**2 / q2)) * np.tan(hms_th_rad/ 2))**2
+                    xbj = q2 / (2 * mp * nu)
 
                     if USING_CURRENT_OFFSET:
                         current_offset = -0.0301
@@ -127,17 +137,15 @@ if os.path.exists(bigtable_filepath):
                         phase = "II"
 
                     bigtable_lookup[runnum] = {"run_type": run_type,
-                                               "start_time": start_time,
-                                               "stop_time": stop_time,
-                                               "boil_corr": boil_corr,
-                                               "fan_mean": fan_mean,
+                                               "target": target,
+                                               "xbj": xbj,
+                                               "q2": q2,
                                                "ebeam": ebeam,
                                                "ibeam": ibeam,
-                                               "ibeam1": ibeam1,
-                                               "ibeam4a": ibeam4a,
-                                               "ibeam4c": ibeam4c,
+                                               # "ibeam1": ibeam1,
+                                               # "ibeam4a": ibeam4a,
+                                               # "ibeam4c": ibeam4c,
                                                "qbeam": qbeam,
-                                               "target": target,
                                                "hms_p": hms_p,
                                                "hms_th": hms_th,
                                                "hms_th_rad": hms_th_rad,
@@ -145,7 +153,7 @@ if os.path.exists(bigtable_filepath):
                                                "ps4": ps4,
                                                "trackeff": trackeff,
                                                "nu": nu,
-                                               "q2": q2,
+                                               "boil_corr": boil_corr,
                                                "epsilon": epsilon,
                                                "weight": weight,
                                                "phase": phase}
@@ -155,6 +163,8 @@ if os.path.exists(bigtable_filepath):
 # -----------------------------------------------------
 # Writing output table
 # -----------------------------------------------------
+matching_rows = []
+
 output_dir = os.path.dirname(output_filepath)
 if output_dir:
     os.makedirs(output_dir, exist_ok=True)
@@ -173,9 +183,15 @@ if bigtable_lookup:
                 target_abbrev.lower() == data["target"].strip().lower() and
                 data["ebeam"].startswith(beam_prefix) and
                 runnum not in skip_runnums):
-            
-                writer.writerow({"runnum": runnum, **data})
-                rows_written += 1
+
+                matching_rows.append({"runnum": runnum, **data})
+
+                if matching_rows:
+                    writer.writerow({"runnum": runnum, **data})
+                    rows_written += 1
+
+                else:
+                    continue
 
     print(f"\n☢️  Saved {rows_written} matching lines to {output_filepath}")
 
