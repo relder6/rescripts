@@ -13,7 +13,7 @@ import csv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_cuts, get_flags
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_cuts, get_flags, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -25,34 +25,40 @@ USING_DELTA_CORR = flags["USING_DELTA_CORR"]
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
+phase = parse_phase(arg4)
 
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0p1"
+if phase == "I":
+    rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0p1"
+elif phase == "II":
+    rootfile_dir = "/volatile/hallc/c-rsidis/relder/STUFF"
 mc_dir = "/work/hallc/c-rsidis/relder/mc-single-arm"
 if target_abbrev not in {"dummy_up", "dummy_down"}:
-    input_settings_filepath = f"../../FILTER_type/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.csv"
+    input_settings_filepath = f"../../FILTER_type/{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
 else:
-    input_settings_filepath = f"../../FILTER_type/DUMMY/{selected_run_type}_{selected_beam_pass}pass_dummy_runs.csv"
+    input_settings_filepath = f"../../FILTER_type/DUMMY/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
 output_dir = f"{target_abbrev.upper()}"
 
 # -----------------------------------------------------
 # Reading in monte-carlo report to obtain normfac
 # -----------------------------------------------------
 if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
-    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev.lower()}.root"
+    mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev.lower()}.root"
     if not os.path.exists(mc_filepath):
         print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Exiting...")
         exit(1)
-    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev.lower()}.out"
+    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev.lower()}.out"
     with open(mc_report_filepath, "r") as infile:
         normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
     normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
+    # print(f"DEBUG: normfac found:{normfac}")
 
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
@@ -110,6 +116,25 @@ variable_mc_map = {
 # -----------------------------------------------------
 # Binning
 # -----------------------------------------------------
+if selected_beam_pass == "3":
+    custom_bins = {
+        "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
+        "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
+        "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
+        "H_kin_Q2": dict(binnum = 20, min = 2.900, max = 6.000),
+        "H_kin_x_bj": dict(binnum = 20, min = 0.2, max = 0.7),
+        "H_kin_W": dict(binnum = 20, min = 2.000, max = 3.000),
+        "H_gtr_p": dict(binnum = 100, min = 1.000, max = 1.400),
+        "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
+        "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
+        "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
+        "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
+        "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+        "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
+        "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+        "H_kin_W2": dict(binnum = 20, min = 4.00, max = 9.00),
+    }
+
 if selected_beam_pass == "4":
     custom_bins = {
         "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
@@ -193,7 +218,6 @@ for i, runnum in enumerate(runnums):
          axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
 
          if target_abbrev == "dummy":
-
              hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
              hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
 
@@ -210,13 +234,12 @@ for i, runnum in enumerate(runnums):
              upstream_mask = yvals < y_mid
              downstream_mask = yvals >= y_mid
 
-             # Here is dummy:cell wall scaling if averaging across entire slab/cell wall
-             # R_dummy_lh2_up = R_dummy_lh2_down = 1 / 7.2323
-             # R_dummy_ld2_up = R_dummy_ld2_down = 1 / 7.7552
-
-             # Here is dummy:cell wall scaling if considering separately upstream from downstream
-             R_dummy_lh2_up, R_dummy_lh2_down = 1 / 8.2325, 1 / 6.4468
-             R_dummy_ld2_up, R_dummy_ld2_down = 1 / 9.4990, 1 / 6.5493
+             if phase == "I":
+                 R_dummy_lh2_up, R_dummy_lh2_down = 1 / 8.2325, 1 / 6.4468
+                 R_dummy_ld2_up, R_dummy_ld2_down = 1 / 9.4990, 1 / 6.5493
+             elif phase == "II":
+                 R_dummy_lh2_up, R_dummy_lh2_down = 1 / 4.43654, 1 / 3.48419
+                 R_dummy_ld2_up, R_dummy_ld2_down = 1 / 5.11908, 1 / 3.53979
 
              weights_lh2 = np.zeros(len(yvals))
              weights_lh2[upstream_mask] = R_dummy_lh2_up * run_weight
@@ -295,39 +318,40 @@ for var, bins in custom_bins.items():
             deltacorr = 1.0
 
             if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
-                # Determined only with carbon, OLD
-                a = 1.012441e+00
-                b = 3.055522e-03
-                c = -1.111970e-03
-                d = -6.311775e-05
-                e = 1.411932e-05
+                if phase == "I":
+                    # Determined only with carbon, OLD
+                    a = 1.012441e+00
+                    b = 3.055522e-03
+                    c = -1.111970e-03
+                    d = -6.311775e-05
+                    e = 1.411932e-05
 
-                # Determined with all solid targets + current offset, NEW
-                # a = 1.010964e+00
-                # b = 3.674720e-03
-                # c = -1.004597e-03
-                # d = -7.751383e-05
-                # e = 1.314690e-05
+                elif phase == "II":
+                    a = 1
+                    b = 0
+                    c = 0
+                    d = 0
+                    e = 0
 
                 deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
-
             elif target_abbrev in {"ld2", "lh2", "dummy"}:
-                # Determined with both ld2, lh2, OLD
-                a = 1.011192e+00
-                b = 5.168480e-03
-                c = -1.104189e-03
-                d = -9.446273e-05
-                e = 1.550629e-05
+                if phase == "I":
+                    # Determined with both ld2, lh2, OLD
+                    a = 1.011192e+00
+                    b = 5.168480e-03
+                    c = -1.104189e-03
+                    d = -9.446273e-05
+                    e = 1.550629e-05
 
-                # Determined with both ld2, lh2, + current offset, NEW
-                # a = 1.010657e+00
-                # b = 5.207270e-03
-                # c = -1.131398e-03
-                # d = -1.002791e-04
-                # e = 1.688177e-05
-
+                elif phase == "II":
+                    a = 1
+                    b = 0
+                    c = 0
+                    d = 0
+                    e = 0
+                    
                 deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
-
+                
             if USING_DELTA_CORR:
                 event_weights = df_mc_cut["weight"].values * normfac * deltacorr
             else:
@@ -366,7 +390,7 @@ for var, rows in hist_data.items():
         mc_row = ["MC", "0", "mc"] + mc_hist_data[var]
         hist_df = pd.concat([pd.DataFrame([mc_row], columns=columns), hist_df], ignore_index = True)
     
-    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_{var}_histo.csv"
+    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_histo.csv"
     output_filepath = f"{output_dir}/{output_filename}"
     hist_df.to_csv(output_filepath, index=False)
 
@@ -376,7 +400,7 @@ for var, rows in hist_data.items():
         mc_err_row = ["MC", "0", "0"] + mc_hist_err[var]
         hist_err_df = pd.concat([pd.DataFrame([mc_err_row], columns=columns), hist_err_df], ignore_index=True)
     
-    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_{var}_err.csv"
+    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_err.csv"
     output_err_filepath = f"{output_dir}/{output_err_filename}"
     hist_err_df.to_csv(output_err_filepath, index=False)
     

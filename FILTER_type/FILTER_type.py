@@ -6,12 +6,13 @@ import numpy as np
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_flags, parse_phase, parse_setting
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_flags, parse_phase, parse_setting, get_common_values
 
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
 flags = get_flags()
+vals = get_common_values()
 
 USING_CURRENT_OFFSET = flags["USING_CURRENT_OFFSET"]
 USING_BOIL_CORR = flags["USING_BOIL_CORR"]
@@ -131,15 +132,10 @@ if os.path.exists(bigtable_filepath):
 
                     weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
 
-                    if runnum <= 27100:
-                        phase = "I"
-                    elif runnum > 27100:
-                        phase = "II"
-
                     bigtable_lookup[runnum] = {"run_type": run_type,
                                                "target": target,
-                                               "xbj": xbj,
-                                               "q2": q2,
+                                               "xbj": f"{xbj:.4f}",
+                                               "q2": f"{q2:.4f}",
                                                "ebeam": ebeam,
                                                "ibeam": ibeam,
                                                # "ibeam1": ibeam1,
@@ -147,15 +143,15 @@ if os.path.exists(bigtable_filepath):
                                                # "ibeam4c": ibeam4c,
                                                "qbeam": qbeam,
                                                "hms_p": hms_p,
-                                               "hms_th": hms_th,
-                                               "hms_th_rad": hms_th_rad,
+                                               "hms_th": f"{float(hms_th):.3f}",
+                                               "hms_th_rad": f"{float(hms_th_rad):.3f}",
                                                "ps3": ps3,
                                                "ps4": ps4,
                                                "trackeff": trackeff,
                                                "nu": nu,
                                                "boil_corr": boil_corr,
-                                               "epsilon": epsilon,
-                                               "weight": weight,
+                                               "epsilon": f"{epsilon:.4f}",
+                                               "weight": f"{weight:8f}",
                                                "phase": phase}
             except (ValueError, KeyError):
                 continue
@@ -163,7 +159,15 @@ if os.path.exists(bigtable_filepath):
 # -----------------------------------------------------
 # Writing output table
 # -----------------------------------------------------
-matching_rows = []
+if phase == "I":
+    if selected_beam_pass == "4":
+        keep_angle = vals["angle_4pass"]
+    elif selected_beam_pass == "5":
+        keep_angle = vals["angle_5pass"]
+elif phase == "II":
+    if selected_beam_pass == "3":
+        keep_angle = vals["angle_3pass_phaseII"]
+angle_tolerance = 1.0
 
 output_dir = os.path.dirname(output_filepath)
 if output_dir:
@@ -184,16 +188,16 @@ if bigtable_lookup:
                 data["ebeam"].startswith(beam_prefix) and
                 runnum not in skip_runnums):
 
-                matching_rows.append({"runnum": runnum, **data})
-
-                if matching_rows:
+                if abs(float(data["hms_th"]) - keep_angle) > angle_tolerance:
+                    continue
+                else:
                     writer.writerow({"runnum": runnum, **data})
                     rows_written += 1
 
-                else:
-                    continue
-
-    print(f"\n☢️  Saved {rows_written} matching lines to {output_filepath}")
+    if rows_written > 0:
+        print(f"\n☢️  Saved {rows_written} matching lines to {output_filepath}")
+    else:
+        print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{target_abbrev}'. No file was written.")
 
 else:
     print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{target_abbrev}'. No file was written.")

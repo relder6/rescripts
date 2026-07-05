@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_cuts
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_cuts, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -20,25 +20,27 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
+phase = parse_phase(arg4)
 
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-input_settings_filepath = f"../FILTER_type/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_runs.csv"
+input_settings_filepath = f"../FILTER_type/{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
 
-histo_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_H_gtr_dp_histo.csv"
-err_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_H_gtr_dp_err.csv"
+histo_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_H_gtr_dp_histo.csv"
+err_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_H_gtr_dp_err.csv"
 
 output_png_dir = "PNGs"
 os.makedirs(output_png_dir, exist_ok = True)
 
 output_csv_dir = "CSVs"
 os.makedirs(output_csv_dir, exist_ok=True)
-output_csv_filepath = f"{output_csv_dir}/yield_check_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}.csv"
+output_csv_filepath = f"{output_csv_dir}/yield_check_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
 
 # -----------------------------------------------------
 # Extracting Run Information
