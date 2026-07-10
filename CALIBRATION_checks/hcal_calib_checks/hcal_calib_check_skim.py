@@ -14,8 +14,9 @@ from scipy.optimize import curve_fit
 # --------------------------------------------------------------------------
 root_directory = f"/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
 bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
-outfile = "CSVs/FIT_hcal_results.csv"
 
+
+# Commenting out lines below because this overwrites the primary output file!  That's an issue!
 # Parsing optional command line input for selected run numbers
 parser = argparse.ArgumentParser()
 parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
@@ -31,12 +32,20 @@ mask = type_mask & polarity_mask
 runnums = data["run"][mask]
 run_types = data["run_type"][mask]
 hms_ps = data["hms_p"][mask]
+hms_ths = data["hms_th"][mask]
 
 if selected_runs is not None:
     run_mask = np.isin(runnums, list(selected_runs))
     runnums = runnums[run_mask]
     run_types = run_types[run_mask]
     hms_ps = hms_ps[run_mask]
+    hms_ths = hms_ths[run_mask]
+    for run in runnums:
+        outfile = f"CSVs/FIT_hcal_{run}"
+
+else:
+    outfile = "CSVs/FIT_hcal_results.csv"
+        
 
 print(f"Found {len(runnums)} runs")
 
@@ -46,11 +55,11 @@ d_calo_fp = 338.69 # distance from focal plane to calorimeter face
 branches = ["H_dc_x_fp", "H_dc_y_fp", "H_dc_xp_fp", "H_dc_yp_fp", "H_gtr_dp", "H_cer_npeSum", "H_gtr_beta", "H_cal_etottracknorm"]
 data_cut = ("(H_gtr_dp > -8) & (H_gtr_dp < 8) & (H_cer_npeSum > 1.5) & (H_gtr_beta > 0.8) & (H_gtr_beta < 1.2) & (H_cal_etottracknorm > 0)")
 
-xbins, ybins = 100, 100
+xbins, ybins = 54, 100
 xmin, xmax = -65.4, 54.6
 ymin, ymax = -30, 30
-xrange = (xmin - 10, xmax + 10)
-yrange = (ymin - 10, ymax + 10)
+yrange = (xmin, xmax)
+xrange = (ymin, ymax)
 
 bin_min, bin_max, bin_num = 0, 2, 100
 data_bins = np.linspace(bin_min, bin_max, bin_num + 1)
@@ -65,21 +74,19 @@ def safe_norm_pos(val, vmin, vmax, prev_pos):
     pos = np.clip(pos, 0.0, 1.0)
     return max(pos, prev_pos)
 
-grid_numrows, grid_numcols, blockspacing = 16, 14, 9
-startrow, startcol = -blockspacing * grid_numrows / 2.0, -blockspacing * grid_numcols / 2.0
-grid_ys = [startrow + i * blockspacing for i in range(grid_numrows + 1)]
-grid_xs = [startcol + i * blockspacing for i in range(grid_numcols + 1)]
+grid_numrows, blockspacing, startrow = 13, 10, -70.4
 
+block_edges = [startrow + i * blockspacing for i in range(grid_numrows + 1)]
 with open(outfile, "w", newline="") as csvfile:
     flush_every = 10
     written = 0
     writer = csv.writer(csvfile)
 
-    writer.writerow(["runnum","run_type","hms_p","fit_mean","mean_err",
+    writer.writerow(["runnum","run_type","hms_p","hms_th","fit_mean","mean_err",
                      "fit_sigma","sigma_err","bin_min","bin_max",
                      "bin_avg","bin_total"])
 
-    for runnum, run_type, hms_p in zip(runnums, run_types, hms_ps):
+    for runnum, run_type, hms_p, hms_th in zip(runnums, run_types, hms_ps, hms_ths):
         print(f"Processing run {runnum} ({run_type})")
         if run_type == "HMSDIS":
             skimfile = f"{root_directory}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
@@ -117,11 +124,11 @@ with open(outfile, "w", newline="") as csvfile:
         
         weight = weight[finite_mask]
 
-        hCaloPos = bh.Histogram(bh.axis.Regular(xbins, xrange[0], xrange[1]),
-                                bh.axis.Regular(ybins, yrange[0], yrange[1]))
+        hCaloPos = bh.Histogram(bh.axis.Regular(ybins, ymin, ymax),
+                                bh.axis.Regular(xbins, xmin, xmax))
 
-        hCaloPosWt = bh.Histogram(bh.axis.Regular(xbins, xrange[0], xrange[1]),
-                                  bh.axis.Regular(ybins, yrange[0], yrange[1]),
+        hCaloPosWt = bh.Histogram(bh.axis.Regular(ybins, ymin, ymax),
+                                  bh.axis.Regular(xbins, xmin, xmax),
                                   storage = bh.storage.Weight())
 
         hCaloPos.fill(ycalo, xcalo)
@@ -178,10 +185,8 @@ with open(outfile, "w", newline="") as csvfile:
 
         ax1.set_title(f"Normalized E/p per Track at Calorimeter", fontsize = 14)
 
-        for y in grid_ys:
-            ax1.hlines(y, startcol, startcol + blockspacing * grid_numcols, colors="silver", linewidth=1.0, alpha=0.6)
-        for x in grid_xs:
-            ax1.vlines(x, startrow, startrow + blockspacing * grid_numrows, colors="silver", linewidth=1.0, alpha=0.6)
+        for edge in block_edges:
+            ax1.axhline(edge, color="silver", linewidth = 1.0, alpha = 0.6)
         # -----------------------------------------------------------------------------
         # Plotting fitted distribution of e/p
         # -----------------------------------------------------------------------------
@@ -296,10 +301,10 @@ with open(outfile, "w", newline="") as csvfile:
         # --------------------------------------------------------------------------
         # Save the combined figure
         # --------------------------------------------------------------------------
-        fig.savefig(f"{run_type}/{run_type}_run_{runnum}_hcal.png", dpi=150, bbox_inches="tight")
+        fig.savefig(f"PNGs/hcal_run_{runnum}.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
 
-        writer.writerow([runnum,run_type,hms_p,mean_fit,mean_err,sigma_fit,sigma_err,fit_bin_min,fit_bin_max,fit_bin_avg,fit_bin_sum])
+        writer.writerow([runnum,run_type,hms_p,hms_th,mean_fit,mean_err,sigma_fit,sigma_err,fit_bin_min,fit_bin_max,fit_bin_avg,fit_bin_sum])
         written += 1
         if written % flush_every == 0:
             csvfile.flush()

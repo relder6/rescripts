@@ -16,11 +16,12 @@ root_directory = f"/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
 bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
 outfile = "CSVs/FIT_pcal_ep_results.csv"
 
-# Parsing optional command line input for selected run numbers
-parser = argparse.ArgumentParser()
-parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
-args = parser.parse_args()
-selected_runs = set(args.runs) if args.runs else None
+# Commenting out lines below because this overwrites the primary output file!  That's an issue!
+# # Parsing optional command line input for selected run numbers
+# parser = argparse.ArgumentParser()
+# parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
+# args = parser.parse_args()
+# selected_runs = set(args.runs) if args.runs else None
 
 data = np.genfromtxt(bigtable_filepath,delimiter=",",names=True,dtype=None,encoding=None)
 
@@ -32,11 +33,11 @@ runnums = data["run"][mask]
 run_types = data["run_type"][mask]
 shms_ps = data["shms_p"][mask]
 
-if selected_runs is not None:
-    run_mask = np.isin(runnums, list(selected_runs))
-    runnums = runnums[run_mask]
-    run_types = run_types[run_mask]
-    shms_ps = shms_ps[run_mask]
+# if selected_runs is not None:
+#     run_mask = np.isin(runnums, list(selected_runs))
+#     runnums = runnums[run_mask]
+#     run_types = run_types[run_mask]
+#     shms_ps = shms_ps[run_mask]
 
 print(f"Found {len(runnums)} runs")
 
@@ -295,7 +296,7 @@ with open(outfile, "w", newline="") as csvfile:
         # --------------------------------------------------------------------------
         # Save the combined figure
         # --------------------------------------------------------------------------
-        fig.savefig(f"{run_type}/{run_type}_run_{runnum}_pcal.png", dpi=150, bbox_inches="tight")
+        fig.savefig(f"PNGs/{run_type}_run_{runnum}_pcal.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
 
         writer.writerow([runnum,run_type,shms_p,mean_fit,mean_err,sigma_fit,sigma_err,fit_bin_min,fit_bin_max,fit_bin_avg,fit_bin_sum])
