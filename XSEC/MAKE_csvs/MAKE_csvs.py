@@ -51,13 +51,16 @@ output_dir = f"{target_abbrev.upper()}"
 # -----------------------------------------------------
 if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
     mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev.lower()}.root"
-    if not os.path.exists(mc_filepath):
-        print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Exiting...")
-        exit(1)
-    mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev.lower()}.out"
-    with open(mc_report_filepath, "r") as infile:
-        normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
-    normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
+
+    mc_exists = os.path.exists(mc_filepath)
+
+    if mc_exists:
+        mc_report_filepath = f"{mc_dir}/outfiles/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev.lower()}.out"
+        with open(mc_report_filepath, "r") as infile:
+            normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
+        normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
+    else:
+        print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Zeroes will be written in MC row.")    
     # print(f"DEBUG: normfac found:{normfac}")
 
 # -----------------------------------------------------
@@ -133,6 +136,8 @@ if selected_beam_pass == "3":
         "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
         "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
         "H_kin_W2": dict(binnum = 20, min = 4.00, max = 9.00),
+        "H_cal_etottracknorm": dict(binnum = 100, min = 0, max = 1.50),
+        "H_cer_npeSum": dict(binnum = 100, min = 0, max = 20)
     }
 
 if selected_beam_pass == "4":
@@ -282,99 +287,104 @@ for i, runnum in enumerate(runnums):
 # -----------------------------------------------------
 # Monte carlo histogram and csv creation
 # -----------------------------------------------------
-if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
-    mc_file = uproot.open(mc_filepath)
-    mc_tree = mc_file["h10"]
-    df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
-    mc_cut = (df_mc["hsdelta"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]))
-    df_mc_cut = df_mc[mc_cut].copy()
-    # print("DEBUG: df_mc shape:", df_mc.shape)
-    # print("DEBUG: df_mc columns:", df_mc.columns.tolist())
-    # print("DEBUG: hsdelta stats:",
-    #       "min=", np.min(df_mc["hsdelta"]),
-    #       "max=", np.max(df_mc["hsdelta"]))
+mc_hist_data = {}
+mc_hist_err = {}
 
-    # print("DEBUG: df_mc_cut shape:", df_mc_cut.shape)
-    # if df_mc_cut.empty:
-    #     print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
-    mc_hist_data = {}
-    mc_hist_err = {}
-
-for var, bins in custom_bins.items():
-    mc_var = None
-    
-    if target_abbrev not in {"optics1", "optics2", "hole"}:
-        mc_var = variable_mc_map.get(var)
-        
-    if mc_var is None or target_abbrev in {"dummy", "optics1", "optics2", "hole"}:
-        continue
-    
-    axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"])
+if mc_exists:
     if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
-        hist_mc = bh.Histogram(axis, storage=bh.storage.Weight())
 
-        if "weight" in df_mc_cut.columns:
-            delta_temp = df_mc_cut["hsdelta"].values
-            deltacorr = 1.0
+        mc_file = uproot.open(mc_filepath)
+        mc_tree = mc_file["h10"]
+        df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
+        mc_cut = (df_mc["hsdelta"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]))
+        df_mc_cut = df_mc[mc_cut].copy()
+        # print("DEBUG: df_mc shape:", df_mc.shape)
+        # print("DEBUG: df_mc columns:", df_mc.columns.tolist())
+        # print("DEBUG: hsdelta stats:",
+        #       "min=", np.min(df_mc["hsdelta"]),
+        #       "max=", np.max(df_mc["hsdelta"]))
 
-            if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
-                if phase == "I":
-                    # Determined only with carbon, OLD
-                    a = 1.012441e+00
-                    b = 3.055522e-03
-                    c = -1.111970e-03
-                    d = -6.311775e-05
-                    e = 1.411932e-05
+        # print("DEBUG: df_mc_cut shape:", df_mc_cut.shape)
+        # if df_mc_cut.empty:
+        #     print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
+        mc_hist_data = {}
+        mc_hist_err = {}
 
-                elif phase == "II":
-                    a = 1
-                    b = 0
-                    c = 0
-                    d = 0
-                    e = 0
+    for var, bins in custom_bins.items():
+        mc_var = None
 
-                deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
-            elif target_abbrev in {"ld2", "lh2", "dummy"}:
-                if phase == "I":
-                    # Determined with both ld2, lh2, OLD
-                    a = 1.011192e+00
-                    b = 5.168480e-03
-                    c = -1.104189e-03
-                    d = -9.446273e-05
-                    e = 1.550629e-05
+        if target_abbrev not in {"optics1", "optics2", "hole"}:
+            mc_var = variable_mc_map.get(var)
 
-                elif phase == "II":
-                    a = 1
-                    b = 0
-                    c = 0
-                    d = 0
-                    e = 0
-                    
-                deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
-                
-            if USING_DELTA_CORR:
-                event_weights = df_mc_cut["weight"].values * normfac * deltacorr
+        if mc_var is None or target_abbrev in {"dummy", "optics1", "optics2", "hole"}:
+            continue
+
+        axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"])
+        if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
+            hist_mc = bh.Histogram(axis, storage=bh.storage.Weight())
+
+            if "weight" in df_mc_cut.columns:
+                delta_temp = df_mc_cut["hsdelta"].values
+                deltacorr = 1.0
+
+                if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
+                    if phase == "I":
+                        # Determined only with carbon, OLD
+                        a = 1.012441e+00
+                        b = 3.055522e-03
+                        c = -1.111970e-03
+                        d = -6.311775e-05
+                        e = 1.411932e-05
+
+                    elif phase == "II":
+                        a = 1
+                        b = 0
+                        c = 0
+                        d = 0
+                        e = 0
+
+                    deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
+                elif target_abbrev in {"ld2", "lh2", "dummy"}:
+                    if phase == "I":
+                        # Determined with both ld2, lh2, OLD
+                        a = 1.011192e+00
+                        b = 5.168480e-03
+                        c = -1.104189e-03
+                        d = -9.446273e-05
+                        e = 1.550629e-05
+
+                    elif phase == "II":
+                        a = 1
+                        b = 0
+                        c = 0
+                        d = 0
+                        e = 0
+
+                    deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
+
+                if USING_DELTA_CORR:
+                    event_weights = df_mc_cut["weight"].values * normfac * deltacorr
+                else:
+                    event_weights = df_mc_cut["weight"].values * normfac
             else:
-                event_weights = df_mc_cut["weight"].values * normfac
-        else:
-            print("Weights branch not found.  Exiting...")
-            print(df_mc_cut.columns.tolist())
-            exit(1)
-        # print(f"\nDEBUG: var={var}, mc_var={mc_var}")
-        # print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
-        # print("DEBUG: bins for this variable:", bins["min"], bins["max"])
-        # print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
-        if var == "H_kin_W2":
-            mc_values = df_mc_cut["w"].values**2
-        else:
-            mc_values = df_mc_cut[mc_var].values
-            
-        hist_mc.fill(mc_values, weight=event_weights)
-        # print("DEBUG: hist sum after fill:", hist_mc.sum())
-        # print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
+                print("Weights branch not found.  Exiting...")
+                print(df_mc_cut.columns.tolist())
+                exit(1)
+            # print(f"\nDEBUG: var={var}, mc_var={mc_var}")
+            # print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
+            # print("DEBUG: bins for this variable:", bins["min"], bins["max"])
+            # print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
+            if var == "H_kin_W2":
+                mc_values = df_mc_cut["w"].values**2
+            else:
+                mc_values = df_mc_cut[mc_var].values
 
-        mc_hist_data[var] = hist_mc.view().value.tolist()
-        mc_hist_err[var] = np.sqrt(hist_mc.view().variance).tolist()
+            hist_mc.fill(mc_values, weight=event_weights)
+            # print("DEBUG: hist sum after fill:", hist_mc.sum())
+            # print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
+
+            mc_hist_data[var] = hist_mc.view().value.tolist()
+            mc_hist_err[var] = np.sqrt(hist_mc.view().variance).tolist()
 
 
 for var, rows in hist_data.items():
@@ -387,9 +397,13 @@ for var, rows in hist_data.items():
     # Saving here for counts
     hist_df = pd.DataFrame(rows, columns=columns)
     if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
-        mc_row = ["MC", "0", "mc"] + mc_hist_data[var]
+        if var in mc_hist_data:
+            mc_values = mc_hist_data[var]
+        else:
+            mc_values = [0.0] * len(bin_centers)
+        mc_row = ["MC", "0", "mc"] + mc_values
         hist_df = pd.concat([pd.DataFrame([mc_row], columns=columns), hist_df], ignore_index = True)
-    
+
     output_filename = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_histo.csv"
     output_filepath = f"{output_dir}/{output_filename}"
     hist_df.to_csv(output_filepath, index=False)
@@ -397,9 +411,13 @@ for var, rows in hist_data.items():
     # Saving here for error bars
     hist_err_df = pd.DataFrame(hist_err_data[var], columns=columns)
     if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
-        mc_err_row = ["MC", "0", "0"] + mc_hist_err[var]
+        if var in mc_hist_err:
+            mc_values_err = mc_hist_err[var]
+        else:
+            mc_values_err = [0.0] * len(bin_centers)
+        mc_err_row = ["MC", "0", "0"] + mc_values_err
         hist_err_df = pd.concat([pd.DataFrame([mc_err_row], columns=columns), hist_err_df], ignore_index=True)
-    
+
     output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_err.csv"
     output_err_filepath = f"{output_dir}/{output_err_filename}"
     hist_err_df.to_csv(output_err_filepath, index=False)
