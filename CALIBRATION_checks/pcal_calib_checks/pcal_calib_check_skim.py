@@ -14,14 +14,13 @@ from scipy.optimize import curve_fit
 # --------------------------------------------------------------------------
 root_directory = f"/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
 bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
-outfile = "CSVs/FIT_pcal_ep_results.csv"
 
 # Commenting out lines below because this overwrites the primary output file!  That's an issue!
 # # Parsing optional command line input for selected run numbers
-# parser = argparse.ArgumentParser()
-# parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
-# args = parser.parse_args()
-# selected_runs = set(args.runs) if args.runs else None
+parser = argparse.ArgumentParser()
+parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
+args = parser.parse_args()
+selected_runs = set(args.runs) if args.runs else None
 
 data = np.genfromtxt(bigtable_filepath,delimiter=",",names=True,dtype=None,encoding=None)
 
@@ -32,12 +31,19 @@ mask = type_mask & polarity_mask
 runnums = data["run"][mask]
 run_types = data["run_type"][mask]
 shms_ps = data["shms_p"][mask]
+shms_ths = data["shms_th"][mask]
 
-# if selected_runs is not None:
-#     run_mask = np.isin(runnums, list(selected_runs))
-#     runnums = runnums[run_mask]
-#     run_types = run_types[run_mask]
-#     shms_ps = shms_ps[run_mask]
+if selected_runs is not None:
+    run_mask = np.isin(runnums, list(selected_runs))
+    runnums = runnums[run_mask]
+    run_types = run_types[run_mask]
+    shms_ps = shms_ps[run_mask]
+    shms_ths = shms_ths[run_mask]
+    for run in runnums:
+        outfile = f"CSVs/FIT_pcal_{run}.csv"
+
+else:
+    outfile = "CSVs/FIT_pcal_results.csv"
 
 print(f"Found {len(runnums)} runs")
 
@@ -76,11 +82,11 @@ with open(outfile, "w", newline="") as csvfile:
     written = 0
     writer = csv.writer(csvfile)
 
-    writer.writerow(["runnum","run_type","shms_p","fit_mean","mean_err",
+    writer.writerow(["runnum","run_type","shms_p","shms_th","fit_mean","mean_err",
                      "fit_sigma","sigma_err","bin_min","bin_max",
                      "bin_avg","bin_total"])
 
-    for runnum, run_type, shms_p in zip(runnums, run_types, shms_ps):
+    for runnum, run_type, shms_p, shms_th in zip(runnums, run_types, shms_ps, shms_ths):
         print(f"Processing run {runnum} ({run_type})")
         if run_type == "SHMSDIS":
             skimfile = f"{root_directory}/skimmed_shms_coin_replay_production_{runnum}_-1.root"
@@ -299,7 +305,7 @@ with open(outfile, "w", newline="") as csvfile:
         fig.savefig(f"PNGs/{run_type}_run_{runnum}_pcal.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
 
-        writer.writerow([runnum,run_type,shms_p,mean_fit,mean_err,sigma_fit,sigma_err,fit_bin_min,fit_bin_max,fit_bin_avg,fit_bin_sum])
+        writer.writerow([runnum,run_type,shms_p,shms_th,mean_fit,mean_err,sigma_fit,sigma_err,fit_bin_min,fit_bin_max,fit_bin_avg,fit_bin_sum])
         written += 1
         if written % flush_every == 0:
             csvfile.flush()
