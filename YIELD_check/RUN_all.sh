@@ -13,7 +13,7 @@ for run_type in "${run_types[@]}"; do
             for phase in "${phases[@]}"; do
                 echo
                 echo "****************************************************"
-                echo "Running $run_type at ${beam_pass}pass on $target"
+                echo "Running $run_type at ${beam_pass}pass on $target phase $phase"
                 "$script_path" "$run_type" "$beam_pass" "$target" "$phase"
             done
         done

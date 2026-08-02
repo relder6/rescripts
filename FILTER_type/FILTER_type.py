@@ -2,15 +2,12 @@
 
 import os, re, sys, csv
 import numpy as np
-
+import pandas as pd
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_flags, parse_phase, parse_setting, get_common_values
 
-# -----------------------------------------------------
-# Handling user inputs
-# -----------------------------------------------------
 flags = get_flags()
 vals = get_common_values()
 
@@ -18,6 +15,9 @@ USING_CURRENT_OFFSET = flags["USING_CURRENT_OFFSET"]
 USING_BOIL_CORR = flags["USING_BOIL_CORR"]
 USING_CURRENT_CUT = flags["USING_CURRENT_CUT"]
 
+# -----------------------------------------------------
+# Things to skip, loop over, etc.
+# -----------------------------------------------------
 if USING_CURRENT_CUT:
     current_cut = 10.0
 else:
@@ -30,79 +30,71 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
                 # 24498,24911,24967,25047,25081,25406,25407,25416,25417,
                 #Now skipping some runs that have negative yields (?!),
                 # 25396, 25397]
-
-arg1 = sys.argv[1] if len(sys.argv) > 1 else None
-arg2 = sys.argv[2] if len(sys.argv) > 2 else None
-arg3 = sys.argv[3] if len(sys.argv) > 3 else None
-arg4 = sys.argv[4] if len(sys.argv) > 4 else None
-
-selected_run_type = parse_run_type(arg1)
-selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
-target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
-phase = parse_phase(arg4)
-selected_setting = parse_setting(selected_beam_pass, phase)
-
-print(f"selected_run_type = {selected_run_type}")
-print(f"selected_beam_pass = {selected_beam_pass}")
-print(f"target = {target_longname}")
-print(f"run phase = {phase}")
-print(f"selected_setting = {selected_setting}")
-
+                
 bigtable_filepaths = {"I": "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv",
                       "II": "/lustre24/expphy/volatile/hallc/c-rsidis/relder/STUFF/rsidis_bigtable_phaseII.csv"}
-output_filepath = f"{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_setting}_{target_abbrev}.csv"
+report_filepaths = {"I": "/w/hallc-scshelf2102/c-rsidis/replay/pass0p1/REPORT_OUTPUT/HMS/PRODUCTION",
+                    "II": "/volatile/hallc/c-rsidis/relder/STUFF/REPORT_PHASEII"}
 
-bigtable_filepath = bigtable_filepaths[phase]
+master_output_filepath = f"MASTER_hmsdis.csv"
+
 # -----------------------------------------------------
 # Bigtable look-up
 # -----------------------------------------------------
-bigtable_lookup = {}
-if os.path.exists(bigtable_filepath):
-    with open(bigtable_filepath, "r") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            try:
-                # Purely reading from the bigtable here,
-                runnum = int(row["run"])
-                run_type = row.get("run_type", "N/A")
-                target = row.get("target", "N/A")
-                ebeam = row.get("ebeam", "N/A")
-                ibeam = row.get("BCM2_I", "N/A")
-                # ibeam1 = row.get("BCM1_I", "N/A")
-                # ibeam4a = row.get("BCM4A_I", "N/A")
-                # ibeam4c = row.get("BCM4C_I", "N/A")
-                qbeam = row.get("BCM2_Q", "N/A")
-                hms_p = row.get("hms_p", "N/A")
-                hms_th = row.get("hms_th", "N/A")
-                ps3 = row.get("ps3", "N/A")
-                ps4 = row.get("ps4", "N/A")
-                trackeff = row.get("h_esing_Eff", "N/A")
-                livetime = row.get("comp_livetime", "N/A")
+targets = ["al", "c", "cu", "dummy", "ld2", "lh2"]
+angle_tolerance = 0.2
+phases = ["I", "II"]
+bigtable_rows_master = []
 
-                # Being sure to only read out the boil_corr for liquid targets,
-                if target_abbrev in ["lh2", "ld2"]:
-                    if USING_BOIL_CORR:
-                        boil_corr = row.get("boil_corr", "N/A")
+for phase in phases:
+    bigtable_filepath = bigtable_filepaths[phase]
+    report_filepath = report_filepaths[phase]
+
+    if os.path.exists(bigtable_filepath):
+        with open(bigtable_filepath, "r") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                try:
+                    runnum = int(row["run"])
+                    run_type = row.get("run_type", "N/A")
+                    if run_type.strip().lower() != "hmsdis":
+                        continue
+                    target = row.get("target", "N/A")
+                    ebeam = float(row.get("ebeam", "N/A"))
+                    ibeam_1 = float(row.get("BCM1_I", "N/A"))
+                    ibeam_2 = float(row.get("BCM2_I", "N/A"))
+                    ibeam_4a = float(row.get("BCM4A_I", "N/A"))
+                    ibeam_4c = float(row.get("BCM4C_I", "N/A"))
+                    qbeam_1 = float(row.get("BCM1_Q", "N/A"))
+                    qbeam_2 = float(row.get("BCM2_Q", "N/A"))
+                    qbeam_4a = float(row.get("BCM4A_Q", "N/A"))
+                    qbeam_4c = float(row.get("BCM4C_Q", "N/A"))
+                    hms_p = float(row.get("hms_p", "N/A"))
+                    hms_th = float(row.get("hms_th", "N/A"))
+                    ps3 = row.get("ps3", "N/A")
+                    ps4 = row.get("ps4", "N/A")
+                    trackeff = float(row.get("h_esing_Eff", "N/A"))
+                    livetime = float(row.get("comp_livetime", "N/A"))
+
+                    # Being sure to only read out the boil_corr for liquid targets,
+                    if target.lower() in ["lh2", "ld2"]:
+                        if USING_BOIL_CORR:
+                            boil_corr = row.get("boil_corr", "N/A")
+                        else:
+                            boil_corr = 1.0
                     else:
                         boil_corr = 1.0
-                else:
-                    boil_corr = 1.0
 
-                # Calculating extra values (like weights) that downstream scripts expect,
-                if (selected_run_type == run_type.strip().lower() and
-                    target_abbrev.lower() == target.strip().lower() and
-                    ebeam.startswith(beam_prefix) and
-                    runnum not in skip_runnums):
-
-                    if ibeam in ["N/A", ""]:
-                        continue
                     try:
-                        if float(ibeam) < current_cut:
+                        if float(ibeam_2) < current_cut:
                             continue
                     except (ValueError, TypeError):
                         continue
-
-                    ps3_val, ps4_val = float(ps3), float(ps4)
+                    try:
+                        ps3_val, ps4_val = float(ps3), float(ps4)
+                    except (ValueError, TypeError):
+                        print(f"WARNING: run {runnum} has non-numeric prescales (ps3 = {ps3}, ps4 = {ps4}), skipping...")
+                        continue
 
                     if ps3_val == -999 or ps4_val == -999:
                         print(f"WARNING: run {runnum} has issues with prescale values.  Fix the lookup table for this setting!")
@@ -126,78 +118,125 @@ if os.path.exists(bigtable_filepath):
 
                     if USING_CURRENT_OFFSET:
                         current_offset = -0.0301
-                        current_offset_corr = 1 / (1 + (current_offset / float(ibeam)))
+                        current_offset_corr = 1 / (1 + (current_offset / float(ibeam_2)))
                     else:
                         current_offset_corr = 1
 
                     weight = (float(boil_corr) * float(ps) * float(current_offset_corr)) / (float(livetime) * float(trackeff))
 
-                    bigtable_lookup[runnum] = {"run_type": run_type,
-                                               "target": target,
-                                               "xbj": f"{xbj:.4f}",
-                                               "q2": f"{q2:.4f}",
-                                               "ebeam": ebeam,
-                                               "ibeam": ibeam,
-                                               # "ibeam1": ibeam1,
-                                               # "ibeam4a": ibeam4a,
-                                               # "ibeam4c": ibeam4c,
-                                               "qbeam": qbeam,
-                                               "hms_p": hms_p,
-                                               "hms_th": f"{float(hms_th):.3f}",
-                                               "hms_th_rad": f"{float(hms_th_rad):.3f}",
-                                               "ps3": ps3,
-                                               "ps4": ps4,
-                                               "trackeff": trackeff,
-                                               "nu": nu,
-                                               "boil_corr": boil_corr,
-                                               "epsilon": f"{epsilon:.4f}",
-                                               "weight": f"{weight:8f}",
-                                               "phase": phase}
-            except (ValueError, KeyError):
-                continue
-                               
-# -----------------------------------------------------
-# Writing output table
-# -----------------------------------------------------
-if phase == "I":
-    if selected_beam_pass == "4":
-        keep_angle = vals["angle_4pass"]
-    elif selected_beam_pass == "5":
-        keep_angle = vals["angle_5pass"]
-elif phase == "II":
-    if selected_beam_pass == "3":
-        keep_angle = vals["angle_3pass_phaseII"]
-angle_tolerance = 1.0
-
-output_dir = os.path.dirname(output_filepath)
-if output_dir:
-    os.makedirs(output_dir, exist_ok=True)
-
-if bigtable_lookup:
-    columns = ["runnum"] + list(next(iter(bigtable_lookup.values())).keys())
-
-    with open(output_filepath, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=columns)
-        writer.writeheader()
-
-        rows_written = 0
-
-        for runnum, data in bigtable_lookup.items():
-            if (selected_run_type == data["run_type"].strip().lower() and
-                target_abbrev.lower() == data["target"].strip().lower() and
-                data["ebeam"].startswith(beam_prefix) and
-                runnum not in skip_runnums):
-
-                if abs(float(data["hms_th"]) - keep_angle) > angle_tolerance:
+                    bigtable_rows_master.append({"runnum": runnum,
+                                                 "run_type": run_type,
+                                                 "target": target,
+                                                 "phase": phase,
+                                                 "xbj": xbj,
+                                                 "q2": q2,
+                                                 "ebeam": ebeam,
+                                                 "ibeam_1": ibeam_1,
+                                                 "ibeam_2": ibeam_2,
+                                                 "ibeam_4a": ibeam_4a,
+                                                 "ibeam_4c": ibeam_4c,
+                                                 "qbeam_1": qbeam_1,
+                                                 "qbeam_2": qbeam_2,
+                                                 "qbeam_4a": qbeam_4a,
+                                                 "qbeam_4c": qbeam_4c,
+                                                 "hms_p": hms_p,
+                                                 "hms_th": hms_th,
+                                                 "hms_th_rad": hms_th_rad,
+                                                 "ps3": ps3,
+                                                 "ps4": ps4,
+                                                 "trackeff": trackeff,
+                                                 "nu": nu,
+                                                 "boil_corr": boil_corr,
+                                                 "epsilon": epsilon,
+                                                 "weight": weight})
+                except (ValueError, KeyError):
                     continue
-                else:
-                    writer.writerow({"runnum": runnum, **data})
-                    rows_written += 1
+bigtable_df_master = pd.DataFrame(bigtable_rows_master)
 
-    if rows_written > 0:
-        print(f"\n☢️  Saved {rows_written} matching lines to {output_filepath}")
-    else:
-        print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{target_abbrev}'. No file was written.")
+# -----------------------------------------------------
+# Report file lookup
+# -----------------------------------------------------
+report_rows_master = []
 
+for phase in phases:
+    report_filepath = report_filepaths[phase]
+    phase_runnums = [r["runnum"] for r in bigtable_rows_master if r["phase"] == phase]
+
+    for runnum in phase_runnums:
+        report_file = f"{report_filepath}/replay_hms_coin_production_{runnum}_-1.report"
+        if not os.path.exists(report_file):
+            continue
+        threeoffour_rate = None
+        threeoffour_counts = None
+        elclean_rate = None
+        elclean_counts = None
+
+        with open(report_file) as rep_file:
+            for repline in rep_file:
+                if repline.startswith("HMS 3/4 Trigger Rate"):
+                    m = re.search(r"\[\s*([0-9.]+)", repline)
+                    if m:
+                        threeoffour_rate = float(m.group(1))
+
+                if repline.startswith("HMS 3/4 Trigger Rate"):
+                    m = re.search(r":\s*([0-9.]+)", repline)
+                    if m:
+                        threeoffour_counts = float(m.group(1))
+
+                if repline.startswith("hEL_CLEAN"):
+                    m = re.search(r"\[\s*([0-9.]+)", repline)
+                    if m:
+                        elclean_rate = float(m.group(1))
+
+                    n = re.search(r":\s*([0-9.]+)", repline)
+                    if n:
+                        elclean_counts = float(n.group(1))
+
+            report_rows_master.append({"runnum": runnum,
+                                       "3of4_rate": threeoffour_rate,
+                                       "3of4_counts": threeoffour_counts,
+                                       "elclean_rate": elclean_rate,
+                                       "elclean_counts": elclean_counts})
+
+report_df_master = pd.DataFrame(report_rows_master)
+# -----------------------------------------------------
+# Writing master file
+# -----------------------------------------------------
+master_df = bigtable_df_master.merge(report_df_master, on="runnum", how="left")
+
+if not master_df.empty:
+    master_df.to_csv(master_output_filepath, index=False)
+    print(f"\n☢️  Saved {len(master_df)} total HMS DIS runs to {master_output_filepath}")
 else:
-    print(f"\n⚠️  No runs matched '{selected_run_type},{selected_beam_pass}Pass,{target_abbrev}'. No file was written.")
+    print(f"\n⚠️  No HMS DIS runs found for phase {phase}. No master file was written.")
+            
+# -----------------------------------------------------
+# Filtering and writing out analysis tables
+# -----------------------------------------------------
+for phase in phases:
+    if phase == "I":
+        valid_beam_passes = ["4", "5"]
+        keep_angle = {"4": vals["angle_4pass"],
+                      "5": vals["angle_5pass"]}
+    elif phase == "II":
+        valid_beam_passes = ["3", "4", "5"]
+        keep_angle = {"3": vals["angle_3pass_phaseII"],
+                      "4": vals["angle_4pass_phaseII"],
+                      "5": vals["angle_5pass_phaseII"]}
+
+    for beam_pass in valid_beam_passes:
+        _, beam_prefix = parse_beam_pass(beam_pass)
+        for target in targets:
+            filtered_df = master_df.copy()
+            filtered_df = filtered_df[filtered_df["phase"] == phase]
+            filtered_df = filtered_df[filtered_df["target"].str.lower() == target]
+            filtered_df = filtered_df[filtered_df["ebeam"].astype(str).str.startswith(beam_prefix)]
+            filtered_df = filtered_df[abs(filtered_df["hms_th"] - keep_angle[beam_pass]) <= angle_tolerance]
+
+            setting = parse_setting(beam_pass, phase)
+            output_dir = target.upper()
+            output_filepath = f"{output_dir}/filtered_hmsdis_{setting}_{target}.csv"
+
+            if not filtered_df.empty:
+                filtered_df.to_csv(output_filepath, index=False)
+                print(f"Saved {len(filtered_df)} runs to {output_filepath}")

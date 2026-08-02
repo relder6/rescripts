@@ -4,11 +4,10 @@ import os, sys, re
 # Settings
 # ---------------------------------------------------------------------
 def get_flags():
-    return {"USING_CURRENT_OFFSET": True,
+    return {"USING_CURRENT_OFFSET": False,
             "USING_BOIL_CORR": True,
-            "USING_CURRENT_CUT": True,
+            "USING_CURRENT_CUT": False,
             "USING_DELTA_CORR": True,}
-
 
 # ---------------------------------------------------------------------
 # Data Cuts
@@ -28,7 +27,11 @@ def get_common_values():
             "angle_4pass": 29.045,
             "angle_5pass": 16.75,
             "ebeam_3pass_phaseII": 6.449,
-            "angle_3pass_phaseII": 44.830}
+            "angle_3pass_phaseII": 44.830,
+            "ebeam_4pass_phaseII": 8.581,
+            "angle_4pass_phaseII": 22.890,
+            "ebeam_5pass_phaseII": 10.67,
+            "angle_5pass_phaseII": 15.97}
 
 # ---------------------------------------------------------------------
 # User Input Processing Logic

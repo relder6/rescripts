@@ -46,6 +46,10 @@ else:
     input_settings_filepath = f"../../FILTER_type/DUMMY/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
 output_dir = f"{target_abbrev.upper()}"
 
+if not os.path.exists(input_settings_filepath):
+    print(f"File {input_settings_filepath} not found; Exiting...")
+    sys.exit(0)
+
 # -----------------------------------------------------
 # Reading in monte-carlo report to obtain normfac
 # -----------------------------------------------------
@@ -77,7 +81,7 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
         try:
             #runnums.append(int(row["runnum"]))
             runnums.append(row["runnum"])
-            charge.append(row["qbeam"])
+            charge.append(row["qbeam_2"])
             weight.append(row["weight"])
             hms_p_val = float(row["hms_p"])
             polarity.append("-" if hms_p_val < 0 else "+")
@@ -85,7 +89,11 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
             continue
         except ValueError:
             continue
+
+
+
 print(f"Found {len(runnums)} runs, processing...")
+print(len(runnums), len(weight), len(charge), len(polarity))
 
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
@@ -98,85 +106,77 @@ branches = ["H_gtr_dp", "H_cal_etottracknorm", "H_gtr_ph",
 
 branches_mc = ["hsdelta", "q2", "xb", "w", "weight", "eprime", "hsytar", "hsxptar", "hsyptar", "hsxfp", "hsxpfp", "hsyfp", "hsypfp"]
 
-variable_mc_map = {
-    "H_gtr_dp": "hsdelta",
-    "H_gtr_ph": "hsyptar",
-    "H_gtr_th": "hsxptar",
-    "H_kin_Q2": "q2",
-    "H_kin_x_bj": "xb",
-    "H_kin_W": "w",
-    "H_gtr_p": "eprime",
-    "H_gtr_y": "hsytar",
-    "H_gtr_th": "hsxptar",
-    "H_gtr_ph": "hsyptar",
-    "H_dc_x_fp": "hsxfp",
-    "H_dc_xp_fp": "hsxpfp",
-    "H_dc_y_fp": "hsyfp",
-    "H_dc_yp_fp": "hsypfp",
-    "H_kin_W2": "w" #Altering the filling of this later
-}
+variable_mc_map = {"H_gtr_dp": "hsdelta",
+                   "H_gtr_ph": "hsyptar",
+                   "H_gtr_th": "hsxptar",
+                   "H_kin_Q2": "q2",
+                   "H_kin_x_bj": "xb",
+                   "H_kin_W": "w",
+                   "H_gtr_p": "eprime",
+                   "H_gtr_y": "hsytar",
+                   "H_gtr_th": "hsxptar",
+                   "H_gtr_ph": "hsyptar",
+                   "H_dc_x_fp": "hsxfp",
+                   "H_dc_xp_fp": "hsxpfp",
+                   "H_dc_y_fp": "hsyfp",
+                   "H_dc_yp_fp": "hsypfp",
+                   "H_kin_W2": "w"}
 
 # -----------------------------------------------------
 # Binning
 # -----------------------------------------------------
 if selected_beam_pass == "3":
-    custom_bins = {
-        "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
-        "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
-        "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
-        "H_kin_Q2": dict(binnum = 20, min = 2.900, max = 6.000),
-        "H_kin_x_bj": dict(binnum = 20, min = 0.2, max = 0.7),
-        "H_kin_W": dict(binnum = 20, min = 2.000, max = 3.000),
-        "H_gtr_p": dict(binnum = 100, min = 1.000, max = 1.400),
-        "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
-        "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
-        "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
-        "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
-        "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-        "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
-        "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-        "H_kin_W2": dict(binnum = 20, min = 4.00, max = 9.00),
-        "H_cal_etottracknorm": dict(binnum = 100, min = 0, max = 1.50),
-        "H_cer_npeSum": dict(binnum = 100, min = 0, max = 20)
-    }
+    custom_bins = {"H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
+                   "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
+                   "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
+                   "H_kin_Q2": dict(binnum = 20, min = 2.900, max = 6.000),
+                   "H_kin_x_bj": dict(binnum = 20, min = 0.2, max = 0.7),
+                   "H_kin_W": dict(binnum = 20, min = 2.000, max = 3.000),
+                   "H_gtr_p": dict(binnum = 100, min = 1.000, max = 1.400),
+                   "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
+                   "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
+                   "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
+                   "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
+                   "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+                   "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
+                   "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+                   "H_kin_W2": dict(binnum = 20, min = 4.00, max = 9.00),
+                   "H_cal_etottracknorm": dict(binnum = 100, min = 0, max = 1.50),
+                   "H_cer_npeSum": dict(binnum = 100, min = 0, max = 20)}
 
 if selected_beam_pass == "4":
-    custom_bins = {
-        "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
-        "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
-        "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
-        "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
-        "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
-        "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
-        "H_gtr_p": dict(binnum = 100, min = 1.3, max = 1.8),
-        "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
-        "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
-        "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
-        "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
-        "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-        "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
-        "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-        "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),
-    }
+    custom_bins = {"H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
+                   "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
+                   "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
+                   "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
+                   "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
+                   "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
+                   "H_gtr_p": dict(binnum = 100, min = 1.3, max = 1.8),
+                   "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
+                   "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
+                   "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
+                   "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
+                   "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+                   "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
+                   "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+                   "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),}
     
 if selected_beam_pass == "5":
-    custom_bins = {
-        "H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
-        "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
-        "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
-        "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
-        "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
-        "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
-        "H_gtr_p": dict(binnum = 100, min = 3.2, max = 5.2),
-        "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
-        "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
-        "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
-        "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
-        "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-        "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
-        "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-        "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),
-    }
+    custom_bins = {"H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
+                   "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
+                   "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
+                   "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
+                   "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
+                   "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
+                   "H_gtr_p": dict(binnum = 100, min = 3.2, max = 5.2),
+                   "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
+                   "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
+                   "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
+                   "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
+                   "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+                   "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
+                   "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+                   "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),}
 
 # -----------------------------------------------------
 # Data histogram and csv creation

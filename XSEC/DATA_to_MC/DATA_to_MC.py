@@ -89,7 +89,6 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
             elec_mask_dummy = df_yield_dummy["polarity"] == "-"
             pos_mask_dummy = df_yield_dummy["polarity"] == "+"
 
-        
         # Charge Normalization
         charge_norm_neg = 0.0
         if np.nansum(df_yield.loc[elec_mask, "charge"]) > 0:
