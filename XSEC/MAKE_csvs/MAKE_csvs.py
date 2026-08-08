@@ -53,6 +53,9 @@ if not os.path.exists(input_settings_filepath):
 # -----------------------------------------------------
 # Reading in monte-carlo report to obtain normfac
 # -----------------------------------------------------
+mc_exists = False
+normfac = 0.0
+
 if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
     mc_filepath = f"{mc_dir}/worksim/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev.lower()}.root"
 
@@ -387,39 +390,120 @@ if mc_exists:
             mc_hist_err[var] = np.sqrt(hist_mc.view().variance).tolist()
 
 
+# -----------------------------------------------------
+# Saving consolidated CSV
+# -----------------------------------------------------
+
+all_rows = []
+
 for var, rows in hist_data.items():
+
     base_var = var.replace("_lh2", "").replace("_ld2", "")
+
     bin_edges = bin_edges_dict[base_var]
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-    bin_labels = [f"{i:.6f}" for i in bin_centers]
-    columns = ["runnum", "charge", "polarity"] + bin_labels
 
-    # Saving here for counts
-    hist_df = pd.DataFrame(rows, columns=columns)
+    nbins = len(bin_centers)
+    bin_min = bin_edges[0]
+    bin_max = bin_edges[-1]
+
+    # -------------------------
+    # MC row
+    # -------------------------
     if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
+
         if var in mc_hist_data:
             mc_values = mc_hist_data[var]
         else:
-            mc_values = [0.0] * len(bin_centers)
-        mc_row = ["MC", "0", "mc"] + mc_values
-        hist_df = pd.concat([pd.DataFrame([mc_row], columns=columns), hist_df], ignore_index = True)
+            mc_values = [0.0] * nbins
 
-    output_filename = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_histo.csv"
-    output_filepath = f"{output_dir}/{output_filename}"
-    hist_df.to_csv(output_filepath, index=False)
+        all_rows.append(
+            [var, "mc", 0, 0, "-",
+             nbins, bin_min, bin_max] + mc_values
+        )
 
-    # Saving here for error bars
-    hist_err_df = pd.DataFrame(hist_err_data[var], columns=columns)
-    if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
         if var in mc_hist_err:
-            mc_values_err = mc_hist_err[var]
+            mc_errors = mc_hist_err[var]
         else:
-            mc_values_err = [0.0] * len(bin_centers)
-        mc_err_row = ["MC", "0", "0"] + mc_values_err
-        hist_err_df = pd.concat([pd.DataFrame([mc_err_row], columns=columns), hist_err_df], ignore_index=True)
+            mc_errors = [0.0] * nbins
 
-    output_err_filename = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_err.csv"
-    output_err_filepath = f"{output_dir}/{output_err_filename}"
-    hist_err_df.to_csv(output_err_filepath, index=False)
-    
-print(f"Saved output CSV files to {target_abbrev.upper()}/ folder.")
+        all_rows.append(
+            [var, "mc_err", 0, 0, "-",
+             nbins, bin_min, bin_max] + mc_errors
+        )
+
+
+    # -------------------------
+    # Data rows
+    # -------------------------
+    for row in rows:
+
+        runnum = row[0]
+        charge_val = row[1]
+        polarity_val = row[2]
+        counts = row[3:]
+
+        all_rows.append(
+            [var, "data",
+             runnum,
+             charge_val,
+             polarity_val,
+             nbins,
+             bin_min,
+             bin_max] + counts
+        )
+
+
+    # -------------------------
+    # Error rows
+    # -------------------------
+    for row in hist_err_data[var]:
+
+        runnum = row[0]
+        charge_val = row[1]
+        polarity_val = row[2]
+        errors = row[3:]
+
+        all_rows.append(
+            [var, "err",
+             runnum,
+             charge_val,
+             polarity_val,
+             nbins,
+             bin_min,
+             bin_max] + errors
+        )
+
+
+# Create column names
+max_bins = max(
+    len(row) - 8
+    for row in all_rows
+)
+
+columns = [
+    "variable",
+    "type",
+    "runnum",
+    "charge",
+    "polarity",
+    "nbins",
+    "bin_min",
+    "bin_max"
+]
+
+columns += [f"bin{i}" for i in range(max_bins)]
+
+
+output_df = pd.DataFrame(all_rows, columns=columns)
+
+os.makedirs(output_dir, exist_ok=True)
+
+output_filepath = (
+    f"{output_dir}/"
+    f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
+)
+
+output_df.to_csv(output_filepath, index=False)
+
+print(f"Saved consolidated CSV: {output_filepath}")

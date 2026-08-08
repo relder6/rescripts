@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
 from matplotlib.lines import Line2D
-import os, sys
+import os, sys, re
 import mplhep
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -40,24 +40,22 @@ pdf_output = f"{pdf_dir}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass
 
 ordered_variables = ["H_gtr_dp"] + [v for v in variables if v != "H_gtr_dp"]
 
-required_files = []
-for var in ordered_variables:
-    histo_filepath = f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_histo.csv"
-    err_filepath   = f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_err.csv"
-    required_files.extend([histo_filepath, err_filepath])
+input_filepath = (f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv")
+
+if not os.path.isfile(input_filepath):
+    print("****************************************************")
+    print(f"No input CSV file found, {selected_run_type} {selected_beam_pass}pass {target_shortname} phase{phase}; skipping PDF creation.\n")
+    sys.exit(0)
 
 if target_abbrev in {"ld2", "lh2"}:
     dummy_dir = "../MAKE_csvs/DUMMY"
-    for var in ordered_variables:
-        dummy_histo_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy_{var}_{target_abbrev}_histo.csv"
-        dummy_err_filepath   = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy_{var}_{target_abbrev}_err.csv"
-        required_files.extend([dummy_histo_filepath, dummy_err_filepath])
+    dummy_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
 
-if not all(os.path.isfile(f) for f in required_files):
-    print("****************************************************")
-    print(f"No input CSV files found, {selected_run_type} {selected_beam_pass}pass {target_shortname} phase{phase}; skipping PDF creation.\n")
-    sys.exit(0)
-
+    if not os.path.isfile(dummy_filepath):
+        print("****************************************************")
+        print(f"No dummy CSV file found, {selected_run_type} {selected_beam_pass}pass dummy phase{phase}; skipping PDF creation.\n")
+        sys.exit(0)
+        
 pp = PdfPages(pdf_output)
     
 # -----------------------------------------------------
@@ -65,99 +63,131 @@ pp = PdfPages(pdf_output)
 # -----------------------------------------------------
 if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
 
+    df_all = pd.read_csv(input_filepath)
+
     for var in ordered_variables:
-        histo_filepath = f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_histo.csv"
-        err_filepath   = f"{base_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}_err.csv"
-        df_yield = pd.read_csv(histo_filepath)
-        df_err = pd.read_csv(err_filepath)
-        if target_abbrev in {"ld2", "lh2"}:
-            dummy_histo_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy_{var}_{target_abbrev}_histo.csv"
-            dummy_err_filepath   = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy_{var}_{target_abbrev}_err.csv"
-            df_yield_dummy = pd.read_csv(dummy_histo_filepath)
-            df_err_dummy = pd.read_csv(dummy_err_filepath)
+        df_var = df_all[df_all["variable"] == var].copy()
+
+        if df_var.empty:
+            continue
+
+        nbins = int(df_var.iloc[0]["nbins"])
+        bin_cols = [f"bin{i}" for i in range(nbins)]
         
-        runinfo_cols = ["runnum","charge","polarity"]
-        bin_cols = [c for c in df_yield.columns if c not in runinfo_cols]
+        if not bin_cols:
+            continue
+        
+        
         if target_abbrev in {"ld2", "lh2"}:
-            bin_cols_dummy = [c for c in df_yield_dummy.columns if c not in runinfo_cols]
+            dummy_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
+            df_dummy = pd.read_csv(dummy_filepath)
+            df_var_dummy = df_dummy[df_dummy["variable"] == var]
+
+            if df_var_dummy.empty:
+                continue
+            
+            nbins_dummy = int(df_var_dummy.iloc[0]["nbins"])
+
+            bin_cols_dummy = [f"bin{i}" for i in range(nbins_dummy)]
+
+            if not bin_cols_dummy:
+                continue
+        
+        runinfo_cols = ["variable","type","runnum","charge","polarity","nbins","bin_min","bin_max"]
 
         # Masks
-        elec_mask = df_yield["polarity"] == "-"
-        pos_mask = df_yield["polarity"] == "+"
-        mc_mask = df_yield["polarity"] == "mc"
+        elec_mask = (df_var["type"] == "data") & (df_var["polarity"] == "-")
+        pos_mask  = (df_var["type"] == "data") & (df_var["polarity"] == "+")
+        elec_mask_err = (df_var["type"] == "err") & (df_var["polarity"] == "-")
+        pos_mask_err  = (df_var["type"] == "err") & (df_var["polarity"] == "+")
+        
+        mc_mask = (df_var["type"] == "mc") & (df_var["polarity"] == "-")
+        mc_mask_err = (df_var["type"] == "mc_err") & (df_var["polarity"] == "-")
+        
         if target_abbrev in {"ld2", "lh2"}:
-            elec_mask_dummy = df_yield_dummy["polarity"] == "-"
-            pos_mask_dummy = df_yield_dummy["polarity"] == "+"
+            elec_mask_dummy = (df_var_dummy["type"] == "data") & (df_var_dummy["polarity"] == "-")
+            pos_mask_dummy = (df_var_dummy["type"] == "data") & (df_var_dummy["polarity"] == "+")
+            elec_mask_dummy_err = (df_var_dummy["type"] == "err") & (df_var_dummy["polarity"] == "-")
+            pos_mask_dummy_err = (df_var_dummy["type"] == "err") & (df_var_dummy["polarity"] == "+")
 
         # Charge Normalization
         charge_norm_neg = 0.0
-        if np.nansum(df_yield.loc[elec_mask, "charge"]) > 0:
-            charge_norm_neg = 1000 / df_yield.loc[elec_mask, "charge"].sum()
-            df_yield.loc[elec_mask, bin_cols] *= charge_norm_neg
-            df_err.loc[elec_mask, bin_cols] *= charge_norm_neg
+        if np.nansum(df_var.loc[elec_mask, "charge"]) > 0:
+            charge_norm_neg = 1000 / df_var.loc[elec_mask, "charge"].sum()
+            df_var.loc[elec_mask, bin_cols] *= charge_norm_neg
         
         charge_norm_pos = 0.0
-        if np.nansum(df_yield.loc[pos_mask, "charge"]) > 0:
-            charge_norm_pos  = 1000 / df_yield.loc[pos_mask , "charge"].sum()
-            df_yield.loc[pos_mask , bin_cols] *= charge_norm_pos
-            df_err.loc[pos_mask , bin_cols] *= charge_norm_pos
+        if np.nansum(df_var.loc[pos_mask, "charge"]) > 0:
+            charge_norm_pos  = 1000 / df_var.loc[pos_mask , "charge"].sum()
+            df_var.loc[pos_mask , bin_cols] *= charge_norm_pos
             
         if target_abbrev in {"ld2", "lh2"}:
             charge_norm_neg_dummy = 0.0
-            if np.nansum(df_yield_dummy.loc[elec_mask_dummy, "charge"]) > 0:
-                charge_norm_neg_dummy = 1000 / df_yield_dummy.loc[elec_mask_dummy, "charge"].sum()
-                df_yield_dummy.loc[elec_mask_dummy, bin_cols_dummy] *= charge_norm_neg_dummy
-                df_err_dummy.loc[elec_mask_dummy, bin_cols_dummy] *= charge_norm_neg_dummy
+            if np.nansum(df_var_dummy.loc[elec_mask_dummy, "charge"]) > 0:
+                charge_norm_neg_dummy = 1000 / df_var_dummy.loc[elec_mask_dummy, "charge"].sum()
+                df_var_dummy.loc[elec_mask_dummy, bin_cols_dummy] *= charge_norm_neg_dummy
 
             charge_norm_pos_dummy = 0.0
-            if np.nansum(df_yield_dummy.loc[pos_mask_dummy, "charge"]) > 0:
-                charge_norm_pos_dummy = 1000 / df_yield_dummy.loc[pos_mask_dummy, "charge"].sum()
-                df_yield_dummy.loc[pos_mask_dummy, bin_cols_dummy] *= charge_norm_pos_dummy
-                df_err_dummy.loc[pos_mask_dummy, bin_cols_dummy] *= charge_norm_pos_dummy
+            if np.nansum(df_var_dummy.loc[pos_mask_dummy, "charge"]) > 0:
+                charge_norm_pos_dummy = 1000 / df_var_dummy.loc[pos_mask_dummy, "charge"].sum()
+                df_var_dummy.loc[pos_mask_dummy, bin_cols_dummy] *= charge_norm_pos_dummy
         
         # Sum Normalized Yields
         yield_neg = np.zeros(len(bin_cols))
-        if np.nansum(df_yield.loc[elec_mask, bin_cols]) > 0:
-            yield_neg = df_yield.loc[elec_mask, bin_cols].astype(float).sum(axis=0).values
+        if np.nansum(df_var.loc[elec_mask, bin_cols]) > 0:
+            yield_neg = df_var.loc[elec_mask, bin_cols].astype(float).sum(axis=0).values
             
         yield_pos = np.zeros(len(bin_cols))
-        if np.nansum(df_yield.loc[pos_mask, bin_cols]) > 0:
-            yield_pos = df_yield.loc[pos_mask , bin_cols].astype(float).sum(axis=0).values
+        if np.nansum(df_var.loc[pos_mask, bin_cols]) > 0:
+            yield_pos = df_var.loc[pos_mask , bin_cols].astype(float).sum(axis=0).values
 
         yield_mc = np.zeros(len(bin_cols))
-        if np.nansum(df_yield.loc[mc_mask, bin_cols]) > 0:
-            yield_mc = df_yield.loc[mc_mask ,  bin_cols].astype(float).values.flatten()
+        if np.nansum(df_var.loc[mc_mask, bin_cols]) > 0:
+            yield_mc = df_var.loc[mc_mask, bin_cols].astype(float).sum(axis=0).values
             
         if target_abbrev in {"ld2", "lh2"}:
             yield_neg_dummy = np.zeros(len(bin_cols_dummy))
-            if np.nansum(df_yield_dummy.loc[elec_mask_dummy, bin_cols_dummy]) > 0:
-                yield_neg_dummy = df_yield_dummy.loc[elec_mask_dummy, bin_cols_dummy].astype(float).sum(axis=0).values
+            if np.nansum(df_var_dummy.loc[elec_mask_dummy, bin_cols_dummy]) > 0:
+                yield_neg_dummy = df_var_dummy.loc[elec_mask_dummy, bin_cols_dummy].astype(float).sum(axis=0).values
             
             yield_pos_dummy = np.zeros(len(bin_cols_dummy))
-            if np.nansum(df_yield_dummy.loc[pos_mask_dummy, bin_cols_dummy]) > 0:
-                yield_pos_dummy = df_yield_dummy.loc[pos_mask_dummy, bin_cols_dummy].astype(float).sum(axis=0).values
+            if np.nansum(df_var_dummy.loc[pos_mask_dummy, bin_cols_dummy]) > 0:
+                yield_pos_dummy = df_var_dummy.loc[pos_mask_dummy, bin_cols_dummy].astype(float).sum(axis=0).values
 
         # Error Propagation
-        err_neg = np.zeros(len(bin_cols))
-        if np.nansum(df_err.loc[elec_mask, bin_cols]) > 0:
-            err_neg = np.sqrt(np.sum(df_err.loc[elec_mask, bin_cols].astype(float).values**2, axis=0))
-            
-        err_pos = np.zeros(len(bin_cols))
-        if np.nansum(df_err.loc[pos_mask, bin_cols]) > 0:    
-            err_pos  = np.sqrt(np.sum(df_err.loc[pos_mask , bin_cols].astype(float).values**2, axis=0))
+        err_neg = df_var.loc[elec_mask_err, bin_cols].astype(float).iloc[0].values
+        err_pos = df_var.loc[pos_mask_err,  bin_cols].astype(float).iloc[0].values
+        err_mc  = df_var.loc[mc_mask_err,   bin_cols].astype(float).iloc[0].values
 
-        err_mc = np.zeros(len(bin_cols))
-        if np.nansum(df_err.loc[mc_mask, bin_cols]) > 0:    
-            err_mc   = df_err.loc[mc_mask, bin_cols].astype(float).values.flatten()
+        err_neg *= charge_norm_neg
+        err_pos *= charge_norm_pos
+        # err_neg = np.zeros(len(bin_cols))
+        # if np.nansum(df_var.loc[elec_mask_err, bin_cols]) > 0:
+        #     err_neg = np.sqrt(np.sum(df_var.loc[elec_mask_err, bin_cols].astype(float).values**2, axis=0))
+            
+        # err_pos = np.zeros(len(bin_cols))
+        # if np.nansum(df_var.loc[pos_mask_err, bin_cols]) > 0:    
+        #     err_pos  = np.sqrt(np.sum(df_var.loc[pos_mask_err, bin_cols].astype(float).values**2, axis=0))
+
+        # err_mc = np.zeros(len(bin_cols))
+        # if np.nansum(df_var.loc[mc_mask_err, bin_cols]) > 0:    
+        #     err_mc = np.sqrt(np.sum(df_var.loc[mc_mask_err, bin_cols].astype(float).values**2, axis=0))
 
         if target_abbrev in {"ld2", "lh2"}:
-            err_neg_dummy = np.zeros(len(bin_cols_dummy))
-            if np.nansum(df_err_dummy.loc[elec_mask_dummy, bin_cols_dummy]) > 0:
-                err_neg_dummy = np.sqrt(np.sum(df_err_dummy.loc[elec_mask_dummy, bin_cols_dummy].astype(float).values**2, axis=0))
+            err_neg_dummy = df_var_dummy.loc[elec_mask_dummy_err, bin_cols_dummy].astype(float).iloc[0].values
+            err_pos_dummy = df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy].astype(float).iloc[0].values
+
+            err_neg_dummy *= charge_norm_neg_dummy
+            err_pos_dummy *= charge_norm_pos_dummy
             
-            err_pos_dummy = np.zeros(len(bin_cols_dummy))
-            if np.nansum(df_err_dummy.loc[pos_mask_dummy, bin_cols_dummy]) > 0:    
-                err_pos_dummy  = np.sqrt(np.sum(df_err_dummy.loc[pos_mask_dummy , bin_cols_dummy].astype(float).values**2, axis=0))                      
+            # err_neg_dummy = np.zeros(len(bin_cols_dummy))
+            # if np.nansum(df_var_dummy.loc[elec_mask_dummy_err, bin_cols_dummy]) > 0:
+            #     err_neg_dummy = np.sqrt(np.sum(df_var_dummy.loc[elec_mask_dummy_err, bin_cols_dummy].astype(float).values**2, axis=0))
+            
+            # err_pos_dummy = np.zeros(len(bin_cols_dummy))
+            # if np.nansum(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy]) > 0:    
+            #     err_pos_dummy  = np.sqrt(np.sum(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy].astype(float).values**2, axis=0))     
+                
             
         # Positron and Dummy Subtraction
         if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
@@ -175,22 +205,25 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
         ratio_err[good] = ratio[good] * np.sqrt((err_sub[good] / yield_sub[good])**2 + (err_mc[good] / yield_mc[good])**2)
 
         # Bin centers
-        bin_centers = np.array([float(cols) for cols in bin_cols])
+        # bin_centers = np.array([float(cols) for cols in bin_cols])
+        nbins = int(df_var.iloc[0]["nbins"])
+        bin_min = df_var.iloc[0]["bin_min"]
+        bin_max = df_var.iloc[0]["bin_max"]
+
+        bin_centers = np.linspace(bin_min,bin_max,nbins,endpoint=False) + (bin_max-bin_min)/(2*nbins)
 
         # Saving binned yield ratios to output CSV
         output_dir = f"{target_shortname.upper()}"
         output_filepath = f"{output_dir}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{var}.csv"
         os.makedirs(output_dir, exist_ok=True)
 
-        df_output = pd.DataFrame({
-            "bin_center": np.round(bin_centers, 4),
-            "yield_sub": yield_sub,
-            "err_sub": err_sub,
-            "yield_mc": yield_mc,
-            "err_mc": err_mc,
-            "ratio": ratio,
-            "ratio_err": ratio_err
-        })
+        df_output = pd.DataFrame({"bin_center": np.round(bin_centers, 4),
+                                  "yield_sub": yield_sub,
+                                  "err_sub": err_sub,
+                                  "yield_mc": yield_mc,
+                                  "err_mc": err_mc,
+                                  "ratio": ratio,
+                                  "ratio_err": ratio_err})
 
         df_output.to_csv(output_filepath, index=False)
 

@@ -24,14 +24,21 @@ def get_data_cuts():
 def get_common_values():
     return {"ebeam_4pass": 8.5831,
             "ebeam_5pass": 10.6716,
+            "ebeam_3pass_phaseII": 6.4724,
+            "ebeam_4pass_phaseII": 8.5814,
+            "ebeam_5pass_phaseII": 10.6759,
+            
             "angle_4pass": 29.045,
             "angle_5pass": 16.75,
-            "ebeam_3pass_phaseII": 6.449,
             "angle_3pass_phaseII": 44.830,
-            "ebeam_4pass_phaseII": 8.581,
             "angle_4pass_phaseII": 22.890,
-            "ebeam_5pass_phaseII": 10.67,
-            "angle_5pass_phaseII": 15.97}
+            "angle_5pass_phaseII": 15.97,
+            
+            "p0_4pass": 1.531,
+            "p0_5pass": 3.642,
+            "p0_3pass_phaseII": 1.165,
+            "p0_4pass_phaseII": 3.254,
+            "p0_5pass_phaseII": 5.343}
 
 # ---------------------------------------------------------------------
 # User Input Processing Logic

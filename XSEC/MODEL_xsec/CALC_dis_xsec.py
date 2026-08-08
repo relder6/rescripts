@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_data_cuts, get_common_values
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
@@ -16,10 +16,12 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bin
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else none
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
+phase = parse_phase(arg4)
 
 vals = get_common_values()
 ebeam_4pass = vals["ebeam_4pass"]
@@ -29,9 +31,13 @@ theta_5pass = vals["angle_5pass"]
 
 model_xsec_dir = "../../../mc-single-arm/util/dis_xec"
 
-infile_name = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}"
+infile_name = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}"
 
-outfile_name = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_model_xsec.csv"
+if not os.path.exists(f"../../../mc-single-arm/infiles/{infile_name}.inp"):
+    print(f"File {infile_name} not found; Exiting...")
+    sys.exit(0)
+
+outfile_name = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_model_xsec.csv"
 # outfile_name = "testing.csv"
 # -----------------------------------------------------
 # Now building input strings, collecting model xsec of bin centers
@@ -39,21 +45,36 @@ outfile_name = f"{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_mo
 model_results = []
 found_header = False
 
-if selected_beam_pass == "4":
-    theta_inp = theta_4pass
-    ebeam = ebeam_4pass
-    ep_min = 1.385555
-    ep_step = 0.01531
-    ep_num = 20
-    p0 = 1.531
+if selected_beam_pass == "3":
+    if phase == "II":
+        ebeam = vals["ebeam_3pass_phaseII"]
+        theta_inp = vals["angle_3pass_phaseII"]
+        p0 = vals["p0_3pass_phaseII"]
+
+elif selected_beam_pass == "4":
+    if phase == "I":
+        ebeam = vals["ebeam_4pass"]
+        theta_inp = vals["angle_4pass"]
+        p0 = vals["p0_4pass"]
+    elif phase == "II":
+        ebeam = vals["ebeam_4pass_phaseII"]
+        theta_inp = vals["angle_4pass_phaseII"]
+        p0 = vals["p0_4pass_phaseII"]
     
 elif selected_beam_pass == "5":
-    theta_inp = theta_5pass
-    ebeam = ebeam_5pass
-    ep_min = 3.296010
-    ep_step = 0.036420
-    ep_num = 20
-    p0 = 3.642
+    if phase == "I":
+        ebeam = vals["ebeam_5pass"]
+        theta_inp = vals["angle_5pass"]
+        p0 = vals["p0_5pass"]
+    elif phase == "II":
+        ebeam = vals["ebeam_5pass_phaseII"]
+        theta_inp = vals["angle_5pass_phaseII"]
+        p0 = vals["p0_5pass_phaseII"]
+
+ep_nums = 20.0
+ep_step = 0.01 * float(p0)
+ep_min = float(p0) - ((ep_nums - 1)/2) * ep_step
+ep_num = int(ep_nums)
 
 theta_rad = np.radians(float(theta_inp))
 
