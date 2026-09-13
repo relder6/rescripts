@@ -4,6 +4,7 @@ PI-SIDIS
 *.dat
 *.png
 *.csv
+*.txt
 ERR_log
 STABILITY_plots
 CSVs

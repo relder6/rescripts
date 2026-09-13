@@ -28,17 +28,7 @@ df = df.sort_values(["momentum", "runnum_int"])
 available_momenta = sorted(df["momentum"].unique())
 available_types = sorted(df["run_type"].unique())
 
-# mom_colors = {mom: plt.cm.Set1.colors[i % 10] for i, mom in enumerate(available_momenta)}
-# cmap = plt.cm.gnuplot
-# colors = cmap(np.linspace(0.1, 0.9, len(available_momenta)))
-
-# mom_colors = {
-#     mom: colors[i]
-#     for i, mom in enumerate(available_momenta)
-# }
-
 angle_values = sorted(df["hms_th"].dropna().unique()) if "hms_th" in df.columns else []
-# angle_colors = {ang: plt.cm.Set1.colors[i % 20] for i, ang in enumerate(angle_values)}
 
 def plot_all_momenta(plot_df, outfile):
     plt.style.use(mplhep.style.ROOT)
@@ -61,7 +51,7 @@ def plot_all_momenta(plot_df, outfile):
 
     x = subdf["runnum_int"].to_numpy()
     y = subdf["fit_mean"].to_numpy()
-    s = subdf["fit_sigma"].to_numpy()
+    s = subdf["mean_err"].to_numpy()
 
     ax_top.fill_between(x, y - 3.0 * s, y + 3.0 * s, alpha=0.36, zorder=0, interpolate=False, label = "$\pm 3\sigma$ band")
     ax_top.set_ylabel(r"H.cal.ettotracknorm Fit")
@@ -83,7 +73,7 @@ def plot_all_momenta(plot_df, outfile):
     ax_bot.set_ylabel("Count")
     ax_bot.grid(True)
 
-    ax_top.set_ylim(0.7,)
+    ax_top.set_ylim(0.8,1.2)
 
     fig.suptitle(f"HMS Calorimeter Stability (All Settings)\nRun Types: {', '.join(available_types)}", fontsize=15)
     # fig.tight_layout()

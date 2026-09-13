@@ -12,20 +12,19 @@ from scipy.optimize import curve_fit
 # --------------------------------------------------------------------------
 # Check file locations before running,
 # --------------------------------------------------------------------------
-root_directory = f"/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
+rootfile_type = 0 #0 for full rootfile, 1 for skimfiles
+
+root_directory = f"/lustre24/expphy/volatile/hallc/c-rsidis/pdbforce/replay/ROOTfiles"
 bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
 
-
-# Commenting out lines below because this overwrites the primary output file!  That's an issue!
 # Parsing optional command line input for selected run numbers
 parser = argparse.ArgumentParser()
 parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
 args = parser.parse_args()
-selected_runs = set(args.runs) if args.runs else None
 
 data = np.genfromtxt(bigtable_filepath,delimiter=",",names=True,dtype=None,encoding=None)
 
-type_mask = np.isin(data["run_type"], ["HMSDIS", "PI-SIDIS", "PI+SIDIS"])
+type_mask = np.isin(data["run_type"], ["HMSDIS", "PI-SIDIS", "PI+SIDIS", "HMSHEE", "HMSHEEP"])
 polarity_mask = data["hms_p"] < 0
 mask = type_mask & polarity_mask
 
@@ -34,26 +33,22 @@ run_types = data["run_type"][mask]
 hms_ps = data["hms_p"][mask]
 hms_ths = data["hms_th"][mask]
 
-if selected_runs is not None:
-    run_mask = np.isin(runnums, list(selected_runs))
-    runnums = runnums[run_mask]
-    run_types = run_types[run_mask]
-    hms_ps = hms_ps[run_mask]
-    hms_ths = hms_ths[run_mask]
-    for run in runnums:
-        outfile = f"CSVs/FIT_hcal_{run}"
-
-else:
-    outfile = "CSVs/FIT_hcal_results.csv"
-        
+outfile = "CSVs/FIT_hcal_results.csv"        
 
 print(f"Found {len(runnums)} runs")
 
 # Defining some common things that will be used in every run analysis,
 d_calo_fp = 338.69 # distance from focal plane to calorimeter face
 
-branches = ["H_dc_x_fp", "H_dc_y_fp", "H_dc_xp_fp", "H_dc_yp_fp", "H_gtr_dp", "H_cer_npeSum", "H_gtr_beta", "H_cal_etottracknorm"]
-data_cut = ("(H_gtr_dp > -8) & (H_gtr_dp < 8) & (H_cer_npeSum > 1.5) & (H_gtr_beta > 0.8) & (H_gtr_beta < 1.2) & (H_cal_etottracknorm > 0)")
+branches = ["H.dc.x_fp", "H.dc.y_fp", "H.dc.xp_fp", "H.dc.yp_fp", "H.gtr.dp", "H.cer.npeSum", "H.gtr.beta", "H.cal.etottracknorm"]
+    
+data_cut = ("(H.gtr.dp > -8) & (H.gtr.dp < 8) & (H.cer.npeSum > 1.5) & (H.gtr.beta > 0.8) & (H.gtr.beta < 1.2) & (H.cal.etottracknorm > 0)")
+
+if rootfile_type == 1:
+    branches = [branch.replace(".", "_") for branch in branches]
+    data_cut = data_cut.replace(".", "_")
+
+x_fp, y_fp, xp_fp, yp_fp, dp, npeSum, beta, etottracknorm = branches
 
 xbins, ybins = 54, 100
 xmin, xmax = -65.4, 54.6
@@ -89,16 +84,16 @@ with open(outfile, "w", newline="") as csvfile:
     for runnum, run_type, hms_p, hms_th in zip(runnums, run_types, hms_ps, hms_ths):
         print(f"Processing run {runnum} ({run_type})")
         if run_type == "HMSDIS":
-            skimfile = f"{root_directory}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
+            rootfile = f"{root_directory}/hms_coin_replay_production_{runnum}_-1.root"
         elif run_type in {"PI-SIDIS", "PI+SIDIS"}:
-            skimfile = f"{root_directory}/skimmed_coin_replay_production_{runnum}_-1.root"
+            rootfile = f"{root_directory}/coin_replay_production_{runnum}_-1.root"
 
-        if not os.path.exists(skimfile):
+        if not os.path.exists(rootfile):
             print(f"ERROR:\tRun {runnum} is missing a ROOTfile; skipping...")
             continue
 
         try:
-            with uproot.open(skimfile) as rootfile:
+            with uproot.open(rootfile) as rootfile:
                 tree = rootfile["T"]
                 arrays = tree.arrays(branches, cut=data_cut, library="np")
         except uproot.exceptions.KeyInFileError as e:
@@ -108,11 +103,11 @@ with open(outfile, "w", newline="") as csvfile:
         # --------------------------------------------------------------------------
         # Setting up variables for plotting
         # --------------------------------------------------------------------------
-        ep = arrays["H_cal_etottracknorm"]
+        ep = arrays[etottracknorm]
         
-        xcalo = (arrays["H_dc_x_fp"]) + (arrays["H_dc_xp_fp"])*d_calo_fp
+        xcalo = (arrays[x_fp]) + (arrays[xp_fp])*d_calo_fp
 
-        ycalo = (arrays["H_dc_y_fp"]) + (arrays["H_dc_yp_fp"])*d_calo_fp
+        ycalo = (arrays[y_fp]) + (arrays[yp_fp])*d_calo_fp
         
         weight = ep
         
@@ -150,7 +145,11 @@ with open(outfile, "w", newline="") as csvfile:
         # -----------------------------------------------------------------------------
         # Getting the figure ready to place both plots
         # -----------------------------------------------------------------------------
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (14, 6), constrained_layout = True)
+        fig, axs = plt.subplots(2,2, figsize = (10, 8), constrained_layout = True)
+        ax1 = axs[0,0]
+        ax2 = axs[0,1]
+        ax3 = axs[1,0]
+        ax4 = axs[1,1]
         fig.suptitle(f"{run_type} Run {runnum}", fontsize=16, fontweight="bold")
 
         # -----------------------------------------------------------------------------
@@ -176,7 +175,7 @@ with open(outfile, "w", newline="") as csvfile:
 
         im = ax1.imshow(data.T,origin="lower",extent=[xrange[0], xrange[1], yrange[0], yrange[1]],aspect="auto",cmap=cmap,norm=norm)
         
-        cbar = fig.colorbar(im, ax=ax1, format='%.1f', pad=0.01)
+        cbar = fig.colorbar(im, ax=ax1, format='%.1f', pad=0.0)
 
         ticks = np.arange(0, int(np.floor(vmax)) + 0.5, 1)
         cbar.set_ticks(ticks)
@@ -190,7 +189,7 @@ with open(outfile, "w", newline="") as csvfile:
         # -----------------------------------------------------------------------------
         # Plotting fitted distribution of e/p
         # -----------------------------------------------------------------------------
-        counts, bin_edges = np.histogram(arrays["H_cal_etottracknorm"], bins=data_bins)
+        counts, bin_edges = np.histogram(arrays[etottracknorm], bins=data_bins)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
         # Initializing fit_failed flag, several checks will be made against this to avoid wasting time fitting nothing
@@ -275,7 +274,7 @@ with open(outfile, "w", newline="") as csvfile:
                 amp_fit = mean_fit = sigma_fit = amp_err = mean_err = sigma_err = np.nan
         
         # Now plotting to the second pad
-        ax2.hist(arrays["H_cal_etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
+        ax2.hist(arrays[etottracknorm], bins=data_bins, histtype='step', color='red', label='E/p')
 
         if not fit_failed:
             x_plot = np.linspace(np.min(x_fit), np.max(x_fit), 500)
@@ -298,6 +297,22 @@ with open(outfile, "w", newline="") as csvfile:
         ax2.grid(alpha=0.5)
         ax2.legend()
 
+        # Now plotting to the third pad
+        h = ax3.hist2d(arrays[etottracknorm],arrays[dp],bins=[100, 100],range=[[0, 2], [-8, 8]], norm=mplcolors.LogNorm(), cmap="plasma")
+        
+        fig.colorbar(h[3], ax=ax3, pad=0.0)
+        
+        ax3.set_ylabel("H.gtr.dp")
+        ax3.set_xlabel("H.cal.etottracknorm")
+        ax3.set_title(r"$H\_gtr\_dp$ vs $H\_cal\_etottracknorm$")
+
+        # Now plotting to the fourth pad
+        h2 = ax4.hist2d(ycalo,xcalo,bins=[100, 100],range=[[ymin,ymax], [xmin, xmax]], norm=mplcolors.LogNorm(), cmap="plasma")
+        fig.colorbar(h2[3], ax=ax4, pad=0.0)
+        ax4.set_ylabel("ycalo")
+        ax4.set_xlabel("xcalo")
+        # ax4.set_title(r"$H\_gtr\_dp$ vs $H\_cal\_etottracknorm$")
+        
         # --------------------------------------------------------------------------
         # Save the combined figure
         # --------------------------------------------------------------------------
