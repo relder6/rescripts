@@ -93,11 +93,6 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
         except ValueError:
             continue
 
-
-
-print(f"Found {len(runnums)} runs, processing...")
-print(len(runnums), len(weight), len(charge), len(polarity))
-
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
 # -----------------------------------------------------
@@ -301,15 +296,8 @@ if mc_exists:
         df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
         mc_cut = (df_mc["hsdelta"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]))
         df_mc_cut = df_mc[mc_cut].copy()
-        # print("DEBUG: df_mc shape:", df_mc.shape)
-        # print("DEBUG: df_mc columns:", df_mc.columns.tolist())
-        # print("DEBUG: hsdelta stats:",
-        #       "min=", np.min(df_mc["hsdelta"]),
-        #       "max=", np.max(df_mc["hsdelta"]))
-
-        # print("DEBUG: df_mc_cut shape:", df_mc_cut.shape)
-        # if df_mc_cut.empty:
-        #     print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
+        if df_mc_cut.empty:
+            print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
         mc_hist_data = {}
         mc_hist_err = {}
 
@@ -373,18 +361,12 @@ if mc_exists:
                 print("Weights branch not found.  Exiting...")
                 print(df_mc_cut.columns.tolist())
                 exit(1)
-            # print(f"\nDEBUG: var={var}, mc_var={mc_var}")
-            # print("DEBUG: data min/max:", df_mc_cut[mc_var].min(), df_mc_cut[mc_var].max())
-            # print("DEBUG: bins for this variable:", bins["min"], bins["max"])
-            # print("DEBUG: weight min/max/sum:",event_weights.min(),event_weights.max(), event_weights.sum())
             if var == "H_kin_W2":
                 mc_values = df_mc_cut["w"].values**2
             else:
                 mc_values = df_mc_cut[mc_var].values
 
             hist_mc.fill(mc_values, weight=event_weights)
-            # print("DEBUG: hist sum after fill:", hist_mc.sum())
-            # print("DEBUG: first 10 bin contents:", hist_mc.view().value[:10])
 
             mc_hist_data[var] = hist_mc.view().value.tolist()
             mc_hist_err[var] = np.sqrt(hist_mc.view().variance).tolist()
@@ -407,9 +389,6 @@ for var, rows in hist_data.items():
     bin_min = bin_edges[0]
     bin_max = bin_edges[-1]
 
-    # -------------------------
-    # MC row
-    # -------------------------
     if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
 
         if var in mc_hist_data:
@@ -417,25 +396,15 @@ for var, rows in hist_data.items():
         else:
             mc_values = [0.0] * nbins
 
-        all_rows.append(
-            [var, "mc", 0, 0, "-",
-             nbins, bin_min, bin_max] + mc_values
-        )
+        all_rows.append([var, "mc", 0, 0, "-",nbins, bin_min, bin_max] + mc_values)
 
         if var in mc_hist_err:
             mc_errors = mc_hist_err[var]
         else:
             mc_errors = [0.0] * nbins
 
-        all_rows.append(
-            [var, "mc_err", 0, 0, "-",
-             nbins, bin_min, bin_max] + mc_errors
-        )
+        all_rows.append([var, "mc_err", 0, 0, "-",nbins, bin_min, bin_max] + mc_errors)
 
-
-    # -------------------------
-    # Data rows
-    # -------------------------
     for row in rows:
 
         runnum = row[0]
@@ -443,20 +412,8 @@ for var, rows in hist_data.items():
         polarity_val = row[2]
         counts = row[3:]
 
-        all_rows.append(
-            [var, "data",
-             runnum,
-             charge_val,
-             polarity_val,
-             nbins,
-             bin_min,
-             bin_max] + counts
-        )
+        all_rows.append([var, "data",runnum,charge_val,polarity_val,nbins,bin_min,bin_max] + counts)
 
-
-    # -------------------------
-    # Error rows
-    # -------------------------
     for row in hist_err_data[var]:
 
         runnum = row[0]
@@ -464,46 +421,21 @@ for var, rows in hist_data.items():
         polarity_val = row[2]
         errors = row[3:]
 
-        all_rows.append(
-            [var, "err",
-             runnum,
-             charge_val,
-             polarity_val,
-             nbins,
-             bin_min,
-             bin_max] + errors
-        )
-
+        all_rows.append([var, "err",runnum,charge_val,polarity_val,nbins,bin_min,bin_max] + errors)
 
 # Create column names
-max_bins = max(
-    len(row) - 8
-    for row in all_rows
-)
+max_bins = max(len(row) - 8 for row in all_rows)
 
-columns = [
-    "variable",
-    "type",
-    "runnum",
-    "charge",
-    "polarity",
-    "nbins",
-    "bin_min",
-    "bin_max"
-]
+columns = ["variable","type","runnum","charge","polarity","nbins","bin_min","bin_max"]
 
 columns += [f"bin{i}" for i in range(max_bins)]
-
 
 output_df = pd.DataFrame(all_rows, columns=columns)
 
 os.makedirs(output_dir, exist_ok=True)
 
-output_filepath = (
-    f"{output_dir}/"
-    f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
-)
+output_filepath = (f"{output_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv")
 
 output_df.to_csv(output_filepath, index=False)
 
-print(f"Saved consolidated CSV: {output_filepath}")
+print(f"Saved {len(runnums)} runs to CSV: {output_filepath}")
