@@ -145,7 +145,7 @@ for target in all_targets:
                     ax.axvline(mc_centroid, linestyle="--", color="lightgrey", alpha=0.9, label=f"MC centroid = {mc_centroid:.4f}")
 
             ax.set_ylabel("Charge-Normalized Yields")
-            ax.set_title(f"{beam_pass} {target} ytar Data vs MC")
+            ax.set_title(f"{beam_pass} {target} phase {phase} ytar Data vs MC")
             ax.grid(True)
             ax.legend(loc="best", frameon=True, fontsize=9, title=shift_label)
             plt.tight_layout()
