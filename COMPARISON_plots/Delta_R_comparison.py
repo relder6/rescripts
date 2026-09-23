@@ -3,7 +3,6 @@
 import os, csv
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.colors import to_rgba
 import mplhep
 from collections import defaultdict
 
@@ -66,36 +65,24 @@ plt.rcParams.update({"figure.titlesize": 26,
                      "ytick.labelsize": 14})
 
 fig, ax = plt.subplots(figsize = (8, 5))
-# plt.subplots_adjust(right = 0.74, bottom = 0.18, left = 0.15)
 
-# base_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 target_list = sorted({d["target"] for d in all_data})
-# target_to_color = {tgt: base_colors[i % len(base_colors)] for i, tgt in enumerate(target_list)}
-# target_to_color = {tgt: ("red" if tgt == "rsidis" else str(0.3 + 0.5 * i / max(1, len(target_list) - 1)))
-#                    for i, tgt in enumerate(target_list)}
-# print(target_to_color)
-
 marker_cycle = ["o", "s", "^", "v", "D", "P", "X", "<", ">", "*", "h", "H", "p", "+", "x"]
 target_to_marker = {tgt: marker_cycle[i % len(marker_cycle)] for i, tgt in enumerate(target_list)}
 
-# def q2_alpha(q2):
-#     if q2_max == q2_min:
-#         return 1.0
-#     return 0.5 + 0.5 * (q2 - q2_min) / (q2_max - q2_min)
+# Assign a unique bright color to every unique RME Q2 value
+rme_q2_values = sorted({round(d["q2"], 2) for d in all_data if d["source"] == "RME_Delta_R_results.csv"})
 
-# def brighten(color, factor = 2):
-#     r, g, b, a = to_rgba(color)
-#     return (min(r * factor, 1), min(g * factor, 1), min(b * factor, 1), a)
+q2_colors = ["#FF0000", "#0066FF", "#00CC00", "#FF00FF", "#FF8C00", "#00CCCC", "#8A2BE2", "#FFD000", "#FF1493", "#00CC66"]
+q2_to_color = {q2: q2_colors[i % len(q2_colors)] for i, q2 in enumerate(rme_q2_values)}
+
+print("RME Q2 colors:")
+for q2, color in q2_to_color.items():
+    print(f"  Q2 = {q2:.2f}: {color}")
 
 group_q2 = defaultdict(list)
-
 for d in all_data:
     group_q2[(d["exp"], d["target"])].append(d["q2"])
-
-# def q2_alpha(q2, q2_min, q2_max):
-#     if q2_max == q2_min:
-#         return 1.0
-#     return 0.35 + 0.65 * (q2 - q2_min) / (q2_max - q2_min)
 
 seen_labels = set()
 legend_handles = []
@@ -114,43 +101,47 @@ for i, d in enumerate(all_data):
         t = 1.0
     else:
         t = (q2 - q2_min) / (q2_max - q2_min)
-    gray = 0.75 - 0.55 * t
-    # alpha = q2_alpha(q2, q2_min, q2_max) if has_multiple_q2[key] else 1.0
 
-    base_color = "red" if is_rme else str(gray)
-    edge_color = base_color
-    face_color = base_color if is_rme else "none"
+    gray = 0.75 - 0.55 * t
+
+    if is_rme:
+        base_color = q2_to_color[round(q2, 2)]
+    else:
+        base_color = str(gray)
+
     size = 130 if is_rme else 70
     zorder = 3 if is_rme else 2
 
     label = f"{exp} {tgt} Q2 = {q2:.2f}"
-
     x_plot = d["xbj"] + xbj_offset[i]
 
-    ax.errorbar(x_plot, d["delta_R"],yerr = d["delta_R_err"],fmt = "none",ecolor = base_color, capsize = 0,zorder = 1,)
+    ax.errorbar(x_plot, d["delta_R"],
+                yerr = d["delta_R_err"],
+                fmt = "none",
+                ecolor = base_color,
+                capsize = 0,
+                zorder = 1)
 
     ax.scatter(x_plot, d["delta_R"],
-               marker=target_to_marker[tgt],
-               s=size,
-               facecolors=base_color if is_rme else "none",
-               edgecolors="black" if is_rme else base_color,
-               linewidths=1.5,
-               zorder=zorder,
-               )
-    
+               marker = target_to_marker[tgt],
+               s = size,
+               facecolors = base_color if is_rme else "none",
+               edgecolors = "black" if is_rme else base_color,
+               linewidths = 1.5,
+               zorder = zorder)
+
     if label not in seen_labels:
         seen_labels.add(label)
         legend_handles.append(Line2D(
             [0], [0],
-            marker=target_to_marker[tgt],
-            linestyle="none",
-            markerfacecolor=base_color if is_rme else "none",
-            markeredgecolor="black" if is_rme else base_color,
-            color="w",
-            label=label,
-            markersize=8 if is_rme else 6,
-        )
-                              )
+            marker = target_to_marker[tgt],
+            linestyle = "none",
+            markerfacecolor = base_color if is_rme else "none",
+            markeredgecolor = "black" if is_rme else base_color,
+            color = "w",
+            label = label,
+            markersize = 8 if is_rme else 6))
+
 ax.axhline(y = 0, color = "black", linewidth = 2, zorder = 0)
 ax.set_xlabel(r"$x_{bj}$")
 ax.set_ylabel(r"$\Delta R = R_A - R_D$")
@@ -162,11 +153,17 @@ xmax = max(p["xbj"] for p in all_data)
 ymin = min(p["delta_R"] - p["delta_R_err"] for p in all_data)
 ymax = max(p["delta_R"] + p["delta_R_err"] for p in all_data)
 pad_frac = 0.05
-# # ax.set_xlim(xmin - pad_frac * (xmax - xmin), xmax + pad_frac * (xmax - xmin))
-# ax.set_xlim(0,  xmax + pad_frac * (xmax - xmin))
-# ax.set_ylim(ymin - pad_frac * (ymax - ymin), ymax + pad_frac * (ymax - ymin))
 
-ax.legend(handles = legend_handles, title = "Legend", loc = "center left", bbox_to_anchor = (1.02, 0.5), title_fontsize = 14, frameon = True, fancybox = True,
-          framealpha = 0.9, facecolor = "white", edgecolor = "black")
+ax.legend(handles = legend_handles,
+          title = "Legend",
+          loc = "center left",
+          bbox_to_anchor = (1.02, 0.5),
+          title_fontsize = 14,
+          frameon = True,
+          fancybox = True,
+          framealpha = 0.9,
+          facecolor = "white",
+          edgecolor = "black")
+
 plt.tight_layout()
 plt.show()
