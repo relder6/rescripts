@@ -11,7 +11,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.jra_nprat import jra_nprat
-from INIT.config import parse_run_type, parse_beam_pass, parse_target
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -20,11 +20,13 @@ arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
 arg4 = sys.argv[4] if len(sys.argv) > 4 else None
+arg5 = sys.argv[5] if len(sys.argv) > 5 else None
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg3)
 denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg4)
+phase = parse_phase(arg5)
 
 A_ratio = num_A / denom_A
 num_N = num_A - num_Z
@@ -33,9 +35,9 @@ denom_N = denom_A - denom_Z
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-num_csv_filepath = f"{num_abbrev.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{num_abbrev}.csv"
+num_csv_filepath = f"{num_abbrev.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{num_abbrev}.csv"
 
-denom_csv_filepath = f"{denom_abbrev.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{denom_abbrev}.csv"
+denom_csv_filepath = f"{denom_abbrev.upper()}/XSEC_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{denom_abbrev}.csv"
 
 # -----------------------------------------------------
 # Preparing Dataframes
@@ -84,7 +86,7 @@ df_merged["xsec_ratio_per_nucleon_err"] = df_merged["xsec_ratio_err"] / A_ratio
 output_dir = "RATIOS"
 os.makedirs(output_dir, exist_ok=True)
 
-output_csv_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_abbrev}_to_{denom_abbrev}.csv"
+output_csv_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{num_abbrev}_to_{denom_abbrev}.csv"
 
 df_merged.to_csv(output_csv_filepath, index=False)
 
@@ -93,7 +95,7 @@ print(f"Saved → {output_csv_filepath}")
 # -----------------------------------------------------
 # Plotting
 # -----------------------------------------------------
-output_pdf_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_{num_abbrev}_to_{denom_abbrev}.pdf"
+output_pdf_filepath = f"{output_dir}/XSEC_RATIO_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{num_abbrev}_to_{denom_abbrev}.pdf"
 
 vars_to_plot = {
     "eprime": df_merged["eprime"].to_numpy(),
@@ -115,7 +117,7 @@ for var, val in vars_to_plot.items():
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.set_xlabel(f"{var}")
     ax.set_ylabel("Cross Section Ratio per Nucleon")
-    ax.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass {num_shortname}/{denom_shortname} Cross Section Ratio per Nucleon")
+    ax.set_title(f"{selected_run_type.upper()} {selected_beam_pass}Pass Phase{phase} {num_shortname}/{denom_shortname} Cross Section Ratio per Nucleon")
     ax.grid()
 
     pp.savefig(fig)

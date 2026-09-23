@@ -81,9 +81,11 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
         if target_abbrev in {"ld2", "lh2"}:
             dummy_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
             df_dummy = pd.read_csv(dummy_filepath)
-            df_var_dummy = df_dummy[df_dummy["variable"] == var]
+            dummy_var = f"{var}_{target_abbrev}"
+            df_var_dummy = df_dummy[df_dummy["variable"] == dummy_var]
 
             if df_var_dummy.empty:
+                print(f"WARNING: No dummy data for variable {var}; skipping")
                 continue
             
             nbins_dummy = int(df_var_dummy.iloc[0]["nbins"])
@@ -155,9 +157,16 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
                 yield_pos_dummy = df_var_dummy.loc[pos_mask_dummy, bin_cols_dummy].astype(float).sum(axis=0).values
 
         # Error Propagation
-        err_neg = df_var.loc[elec_mask_err, bin_cols].astype(float).iloc[0].values
-        err_pos = df_var.loc[pos_mask_err,  bin_cols].astype(float).iloc[0].values
-        err_mc  = df_var.loc[mc_mask_err,   bin_cols].astype(float).iloc[0].values
+        err_neg = np.zeros(len(bin_cols))
+        err_pos = np.zeros(len(bin_cols))
+        err_mc = np.zeros(len(bin_cols))
+
+        if np.nansum(df_var.loc[elec_mask_err, bin_cols]) > 0:
+            err_neg = df_var.loc[elec_mask_err, bin_cols].astype(float).iloc[0].values
+        if np.nansum(df_var.loc[pos_mask_err, bin_cols]) > 0:
+            err_pos = df_var.loc[pos_mask_err,  bin_cols].astype(float).iloc[0].values
+        if np.nansum(df_var.loc[mc_mask_err, bin_cols]) > 0:
+            err_mc  = df_var.loc[mc_mask_err,   bin_cols].astype(float).iloc[0].values
 
         err_neg *= charge_norm_neg
         err_pos *= charge_norm_pos
@@ -174,8 +183,22 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
         #     err_mc = np.sqrt(np.sum(df_var.loc[mc_mask_err, bin_cols].astype(float).values**2, axis=0))
 
         if target_abbrev in {"ld2", "lh2"}:
+
+            print("\nDEBUG dummy:")
+            print("df_var_dummy shape:", df_var_dummy.shape)
+            print("df_var_dummy columns:", df_var_dummy.columns.tolist())
+            print("pos_mask_dummy_err:", pos_mask_dummy_err)
+            print("number selected:", pos_mask_dummy_err.sum())
+
+            print("\nSelected rows:")
+            print(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy])
+            
             err_neg_dummy = df_var_dummy.loc[elec_mask_dummy_err, bin_cols_dummy].astype(float).iloc[0].values
-            err_pos_dummy = df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy].astype(float).iloc[0].values
+
+            err_pos_dummy = np.zeros(len(bin_cols_dummy))
+            if np.nansum(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy]) > 0:
+                err_pos_dummy = df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy].astype(float).iloc[0].values
+
 
             err_neg_dummy *= charge_norm_neg_dummy
             err_pos_dummy *= charge_norm_pos_dummy
@@ -188,7 +211,7 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
             # if np.nansum(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy]) > 0:    
             #     err_pos_dummy  = np.sqrt(np.sum(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy].astype(float).values**2, axis=0))     
                 
-            
+
         # Positron and Dummy Subtraction
         if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
             yield_sub = yield_neg - yield_pos
@@ -300,6 +323,37 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
                 print(f"Yield_Pos:\t{yield_pos_tot:10.2f}\t±  {err_pos_tot:8.2f}")
                 print(f"\nY_Sub/Y_MC:\t{100*ratio_data_to_mc:8.2f}%\t±  {100*err_ratio_data_to_mc:8.2f}%")
                 print(f"Y_Pos/Y_Raw:\t{100*ratio_pos_to_neg:8.2f}%\t±  {100*err_ratio_pos_to_neg:8.2f}%")
+
+                summary_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "CSVs")
+                summary_filepath = os.path.join(summary_dir, "summary.csv")
+                os.makedirs(summary_dir, exist_ok=True)
+
+                summary_row = pd.DataFrame([{"run_type": selected_run_type,
+                                             "beam_pass": selected_beam_pass,
+                                             "phase": phase,
+                                             "target": target_abbrev,
+                                             "target_name": target_longname,
+                                             "Yraw": yield_neg_tot,
+                                             "Yraw_err": err_neg_tot,
+                                             "Ysub": yield_sub_tot,
+                                             "Ysub_err": err_sub_tot,
+                                             "Ymc": yield_mc_tot,
+                                             "Ymc_err": err_mc_tot,
+                                             "Ypos": yield_pos_tot,
+                                             "Ypos_err": err_pos_tot,
+                                             "Ysub_over_Ymc": ratio_data_to_mc,
+                                             "Ysub_over_Ymc_err": err_ratio_data_to_mc,
+                                             "Ypos_over_Yraw": ratio_pos_to_neg,
+                                             "Ypos_over_Yraw_err": err_ratio_pos_to_neg,}])
+                if os.path.isfile(summary_filepath) and os.path.getsize(summary_filepath) > 0:
+                    df_summary = pd.read_csv(summary_filepath)
+                    matching_row = ((df_summary["run_type"] == selected_run_type) & (df_summary["beam_pass"] == selected_beam_pass) & (df_summary["phase"] == phase) & (df_summary["target"] == target_abbrev))
+                    df_summary = df_summary[~matching_row]
+                    df_summary = pd.concat([df_summary, summary_row], ignore_index=True)
+
+                else:
+                    df_summary = summary_row
+                df_summary.to_csv(summary_filepath, index = False)
         else:
             ax_top.errorbar(bin_centers, yield_sub, yerr=err_sub, fmt="o", markersize=3, color="navy", label="$Yield_{{Sub}}$")
             ax_top.errorbar(bin_centers, yield_mc,  yerr=err_mc, fmt="o", markersize=3, color="red",  label="$Yield_{{MC}}$")

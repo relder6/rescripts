@@ -18,7 +18,7 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
-rootfile_type = 0 #0 for full rootfile, 1 for skimfiles
+rootfile_type = 1 #0 for full rootfile, 1 for skimfiles
 
 flags = get_flags()
 
@@ -78,6 +78,7 @@ if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
 runnums = []
 weight = []
 charge = []
+current = []
 polarity = []
 
 with open(input_settings_filepath, "r", newline="") as csvfile:
@@ -87,6 +88,7 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
             #runnums.append(int(row["runnum"]))
             runnums.append(row["runnum"])
             charge.append(row["qbeam_2"])
+            current.append(row["ibeam_2"])
             weight.append(row["weight"])
             hms_p_val = float(row["hms_p"])
             polarity.append("-" if hms_p_val < 0 else "+")
@@ -103,8 +105,8 @@ branches_mc = ["hsdelta", "q2", "xb", "w", "weight", "eprime", "hsytar", "hsxpta
 branches = ["H.gtr.dp", "H.cal.etottracknorm", "H.gtr.ph",
             "H.gtr.th", "H.gtr.x", "H.gtr.y",
             "H.kin.Q2", "H.kin.x_bj", "H.kin.W",
-            "H_cer_npeSum", "H.gtr.p",
-            "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp"]
+            "H.cer.npeSum", "H.gtr.p",
+            "H.dc.x_fp", "H.dc.xp_fp", "H.dc.y_fp", "H.dc.yp_fp"]
 
 variable_mc_map = {"H.gtr.dp": "hsdelta",
                    "H.gtr.ph": "hsyptar",
@@ -116,10 +118,10 @@ variable_mc_map = {"H.gtr.dp": "hsdelta",
                    "H.gtr.y": "hsytar",
                    "H.gtr.th": "hsxptar",
                    "H.gtr.ph": "hsyptar",
-                   "H_dc_x_fp": "hsxfp",
-                   "H_dc_xp_fp": "hsxpfp",
-                   "H_dc_y_fp": "hsyfp",
-                   "H_dc_yp_fp": "hsypfp",
+                   "H.dc.x_fp": "hsxfp",
+                   "H.dc.xp_fp": "hsxpfp",
+                   "H.dc.y_fp": "hsyfp",
+                   "H.dc.yp_fp": "hsypfp",
                    "H.kin.W2": "w"}
 
 if rootfile_type == 1:
@@ -203,24 +205,27 @@ for i, runnum in enumerate(runnums):
      if rootfile_type == 0:
          rootfile_path = f"{rootfile_dir}/hms_coin_replay_production_{runnum}_-1.root"
      if rootfile_type == 1:
-         rootfile_path = f"{rootfile_dir}/skimmmed_hms_coin_replay_production_{runnum}_-1.root"
+         rootfile_path = f"{rootfile_dir}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
      if not os.path.exists(rootfile_path):
          print(f"WARNING: Missing {rootfile_path}, skipping...")
          continue
      tree = uproot.open(rootfile_path)["T"]
      arr = tree.arrays(branches, library = "np")
      df = pd.DataFrame(arr)
+     
+     if rootfile_type == 0:
+         dp = df["H.gtr.dp"]
+         cer = df["H.cer.npeSum"]
+         cal = df["H.cal.etottracknorm"]
+         ytar = df["H.gtr.y"]
+     elif rootfile_type == 1:
+         dp = df["H_gtr_dp"]
+         cer = df["H_cer_npeSum"]
+         cal = df["H_cal_etottracknorm"]
+         ytar = df["H_gtr_y"]
+         
      if target_abbrev not in {"dummy_up", "dummy_down"}:
-         if rootfile_type == 0:
-             dp = df["H.gtr.dp"]
-             cer = df["H.cer.npeSum"]
-             cal = df["H.cal.etottracknorm"]
-             ytar = df["H.gtr.y"]
-         elif rootfile_type == 1:
-             dp = df["H_gtr_dp"]
-             cer = df["H_cer_npeSum"]
-             cal = df["H_cal_etottracknorm"]
-             ytar = df["H_gtr_y"]
+
          data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
                      (cer > cuts["H_cer_npeSum_cut"]) &
                      (cal > cuts["H_cal_etottracknorm_cut"]))
@@ -291,11 +296,11 @@ for i, runnum in enumerate(runnums):
              errors_lh2 = np.sqrt(hist_lh2.view().variance)
              errors_ld2 = np.sqrt(hist_ld2.view().variance)
 
-             hist_data.setdefault(var + "_lh2", []).append([runnum, charge[i], polarity[i]] + counts_lh2.tolist())
-             hist_err_data.setdefault(var + "_lh2", []).append([runnum, charge[i], polarity[i]] + errors_lh2.tolist())
+             hist_data.setdefault(var + "_lh2", []).append([runnum, charge[i], current[i], polarity[i]] + counts_lh2.tolist())
+             hist_err_data.setdefault(var + "_lh2", []).append([runnum, charge[i], current[i], polarity[i]] + errors_lh2.tolist())
 
-             hist_data.setdefault(var + "_ld2", []).append([runnum, charge[i], polarity[i]] + counts_ld2.tolist())
-             hist_err_data.setdefault(var + "_ld2", []).append([runnum, charge[i], polarity[i]] + errors_ld2.tolist())
+             hist_data.setdefault(var + "_ld2", []).append([runnum, charge[i], current[i], polarity[i]] + counts_ld2.tolist())
+             hist_err_data.setdefault(var + "_ld2", []).append([runnum, charge[i], current[i], polarity[i]] + errors_ld2.tolist())
              
          else:     
              hist = bh.Histogram(axis, storage=bh.storage.Weight())
@@ -315,8 +320,8 @@ for i, runnum in enumerate(runnums):
              counts = hist.view().value
              errors = np.sqrt(hist.view().variance)
          
-             hist_data[var].append([runnum, charge[i], polarity[i]]+counts.tolist())
-             hist_err_data[var].append([runnum, charge[i], polarity[i]]+errors.tolist())
+             hist_data[var].append([runnum, charge[i], current[i], polarity[i]]+counts.tolist())
+             hist_err_data[var].append([runnum, charge[i], current[i], polarity[i]]+errors.tolist())
 
 # -----------------------------------------------------
 # Monte carlo histogram and csv creation
@@ -417,6 +422,7 @@ all_rows = []
 for var, rows in hist_data.items():
 
     base_var = var.replace("_lh2", "").replace("_ld2", "")
+    output_var = base_var.replace(".", "_")
 
     bin_edges = bin_edges_dict[base_var]
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
@@ -432,37 +438,39 @@ for var, rows in hist_data.items():
         else:
             mc_values = [0.0] * nbins
 
-        all_rows.append([var, "mc", 0, 0, "-",nbins, bin_min, bin_max] + mc_values)
+        all_rows.append([output_var, "mc", 0, 0, 0, "-",nbins, bin_min, bin_max] + mc_values)
 
         if var in mc_hist_err:
             mc_errors = mc_hist_err[var]
         else:
             mc_errors = [0.0] * nbins
 
-        all_rows.append([var, "mc_err", 0, 0, "-",nbins, bin_min, bin_max] + mc_errors)
+        all_rows.append([output_var, "mc_err", 0, 0, 0, "-",nbins, bin_min, bin_max] + mc_errors)
 
     for row in rows:
 
         runnum = row[0]
         charge_val = row[1]
-        polarity_val = row[2]
-        counts = row[3:]
+        current_val = row[2]
+        polarity_val = row[3]
+        counts = row[4:]
 
-        all_rows.append([var, "data",runnum,charge_val,polarity_val,nbins,bin_min,bin_max] + counts)
+        all_rows.append([output_var, "data",runnum,charge_val,current_val,polarity_val,nbins,bin_min,bin_max] + counts)
 
     for row in hist_err_data[var]:
 
         runnum = row[0]
         charge_val = row[1]
-        polarity_val = row[2]
-        errors = row[3:]
+        current_val = row[2]
+        polarity_val = row[3]
+        errors = row[4:]
 
-        all_rows.append([var, "err",runnum,charge_val,polarity_val,nbins,bin_min,bin_max] + errors)
+        all_rows.append([output_var, "err",runnum,charge_val,current_val,polarity_val,nbins,bin_min,bin_max] + errors)
 
 # Create column names
-max_bins = max(len(row) - 8 for row in all_rows)
+max_bins = max(len(row) - 9 for row in all_rows)
 
-columns = ["variable","type","runnum","charge","polarity","nbins","bin_min","bin_max"]
+columns = ["variable","type","runnum","charge","current","polarity","nbins","bin_min","bin_max"]
 
 columns += [f"bin{i}" for i in range(max_bins)]
 

@@ -16,7 +16,7 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_pha
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
-arg4 = sys.argv[4] if len(sys.argv) > 4 else none
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
@@ -38,7 +38,51 @@ if not os.path.exists(f"../../../mc-single-arm/infiles/{infile_name}.inp"):
     sys.exit(0)
 
 outfile_name = f"{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_model_xsec.csv"
-# outfile_name = "testing.csv"
+
+# -----------------------------------------------------
+# Read rctable name from the mc-single-arm input file
+# -----------------------------------------------------
+infile_path = f"../../../mc-single-arm/infiles/{infile_name}.inp"
+
+with open(infile_path, "r") as infile:
+    for line in infile:
+        if "Name of rctable" in line:
+            rctable_name = line.split()[0]
+            break
+
+rctable_path = f"../../../mc-single-arm/rctables/{rctable_name}"
+
+if not os.path.exists(rctable_path):
+    print(f"RCTABLE {rctable_path} not found; Exiting...")
+    sys.exit(0)
+
+# -----------------------------------------------------
+# Read Coulomb corrections from rctable
+# -----------------------------------------------------
+rctable = []
+
+with open(rctable_path, "r") as rctable_file:
+    for line in rctable_file:
+        if line.startswith("***"):
+            continue
+
+        parts = line.split()
+        if len(parts) < 13:
+            continue
+
+        try:
+            rctable.append({"eprime": float(parts[1]),
+                            "theta": float(parts[2]),
+                            "coulomb_corr": float(parts[12])})
+        except ValueError:
+            continue
+
+rctable_df = pd.DataFrame(rctable)
+
+if rctable_df.empty:
+    print(f"No valid rows found in {rctable_path}; Exiting...")
+    sys.exit(0)
+    
 # -----------------------------------------------------
 # Now building input strings, collecting model xsec of bin centers
 # -----------------------------------------------------
@@ -119,6 +163,11 @@ try:
             model_xsec = float(parts[-1])
         except ValueError:
             continue
+
+        distances = np.sqrt((rctable_df["eprime"] - model_eprime)**2 +(rctable_df["theta"] - model_theta)**2)
+
+        closest_idx = distances.idxmin()
+        coulomb_corr = rctable_df.loc[closest_idx, "coulomb_corr"]
         nu = ebeam - model_eprime
 
         if model_q2 > 0:
@@ -134,6 +183,7 @@ try:
                               "q2": model_q2,
                               "w": model_w,
                               "modelxsec": model_xsec,
+                              "coulomb_corr": coulomb_corr,
                               "epsilon": epsilon,
                               "delta": delta})
         

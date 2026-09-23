@@ -13,6 +13,11 @@ for run_type in "${run_types[@]}"; do
     for beam_pass in "${beam_passes[@]}"; do
         for target in "${targets[@]}"; do
             for phase in "${phases[@]}"; do
+
+                if [[ "$beam_pass" == "3" && "$phase" == "i" ]]; then
+                    continue
+                fi
+                
                 "$script_path" "$run_type" "$beam_pass" "$target" "$phase"
             done
         done

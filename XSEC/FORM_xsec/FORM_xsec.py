@@ -10,7 +10,7 @@ import os, re, sys
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
-from INIT.config import parse_run_type, parse_beam_pass, parse_target
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -18,19 +18,21 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 selected_beam_pass, beam_prefix = parse_beam_pass(arg2)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg3)
+phase = parse_phase(arg4)
 
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-model_xsec_filepath = f"../MODEL_xsec/{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_model_xsec.csv"
+model_xsec_filepath = f"../MODEL_xsec/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_model_xsec.csv"
 
-data_to_mc_filepath = f"../DATA_to_MC/{target_abbrev.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}_H_gtr_dp.csv"
+data_to_mc_filepath = f"../DATA_to_MC/{target_abbrev.upper()}/DATA_to_MC_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_H_gtr_dp.csv"
 
-xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}.pdf"
+xsec_pdf_output = f"PDFs/XSEC_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.pdf"
 
 # -----------------------------------------------------
 # Preparing Dataframes
@@ -54,7 +56,13 @@ df_merged["xsec_exp"] = df_merged["ratio"] * df_merged["modelxsec"]
 df_merged["xsec_exp_err"] = df_merged["xsec_exp"] * (df_merged["ratio_err"] / df_merged["ratio"])
 
 df_merged["xsec_exp"] = df_merged["xsec_exp"].replace([np.inf, -np.inf], np.nan)
+
 df_merged["xsec_exp_err"] = df_merged["xsec_exp_err"].replace([np.inf, -np.inf], np.nan)
+
+# Applying coulomb corrections,
+
+df_merged["xsec_exp"] *= df_merged["coulomb_corr"]
+df_merged["xsec_exp_err"] *= df_merged["coulomb_corr"]
 
 # -----------------------------------------------------
 # Save output csv
@@ -67,7 +75,7 @@ df_merged["target"] = target_longname
 output_dir = f"{target_abbrev.upper()}"
 os.makedirs(output_dir, exist_ok=True)
 
-output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_{target_abbrev}.csv"
+output_filepath = f"{output_dir}/XSEC_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
 
 final_columns = ["target", "A", "Z", "eprime", "theta", "xbj", "q2", "w", "epsilon", "modelxsec", "xsec_exp", "xsec_exp_err"]
 
@@ -80,6 +88,23 @@ print(f"Saved → {output_filepath}")
 # -----------------------------------------------------
 # Plotting
 # -----------------------------------------------------
+# print("\n===== XSEC DEBUG =====")
+# print(df_merged[["delta", "ratio", "ratio_err", "modelxsec", "xsec_exp", "xsec_exp_err"]].to_string())
+
+# print("\nmodelxsec:")
+# print(df_merged["modelxsec"].describe())
+
+# print("\nratio:")
+# print(df_merged["ratio"].describe())
+
+# print("\nxsec_exp:")
+# print(df_merged["xsec_exp"].describe())
+
+# print("\nNaN counts:")
+# print(df_merged[["ratio", "modelxsec", "xsec_exp"]].isna().sum())
+
+print("======================\n")
+
 vars_to_plot = {
     "eprime": df_final["eprime"].to_numpy(),
     "xbj": df_final["xbj"].to_numpy(),
