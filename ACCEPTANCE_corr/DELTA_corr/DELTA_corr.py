@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # orders = [3, 4, 5, 6]
 orders = [4]
 
-ratio_directory = "../XSEC/DATA_to_MC"
+ratio_directory = "../../XSEC/DATA_to_MC"
 
 beam_passes = {"4pass", "5pass"}
 
@@ -24,7 +24,9 @@ beam_passes = {"4pass", "5pass"}
 
 # targets = {"C"}
 
-targets = {"LH2", "LD2"}
+targets = {"C"}
+
+phases = {"II"}
 
 # -----------------------------------------------------
 # Reading in and compiling the csv; p0 fit to offset and overlay
@@ -36,7 +38,8 @@ def poly0_fit(x, p0):
 
 for beam_pass in beam_passes:
     for target in targets:
-        csv_file = f"{ratio_directory}/{target.upper()}/DATA_to_MC_hmsdis_{beam_pass}_{target.lower()}_H_gtr_dp.csv"
+        for phase in phases:
+            csv_file = f"{ratio_directory}/{target.upper()}/DATA_to_MC_hmsdis_{beam_pass}_phase{phase}_{target.lower()}_H_gtr_dp.csv"
 
         if not os.path.exists(csv_file):
             print(f"Skipping missing file: {csv_file}")
