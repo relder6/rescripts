@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# -----------------------------------------------------
+# Rosenbluth separation of cross sections
+# To be used as part of larger analysis framework for the
+# extraction of R = sigma_L / sigma_T in DIS
+# -----------------------------------------------------
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +17,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from scipy.optimize import curve_fit
 from collections import defaultdict
-from INIT.config import parse_run_type, parse_beam_pass, parse_target
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -20,15 +26,17 @@ USING_SYST_ERR_EST = True
 
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
+arg3 = sys.argv[3] if len(sys.argv) > 3 else None
 
 selected_run_type = parse_run_type(arg1)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg2)
+phase = parse_phase(arg3)
 
 os.makedirs("CSVs", exist_ok=True)
-bc_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_{target_abbrev}.csv"
+bc_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_phase{phase}_{target_abbrev}.csv"
 
 os.makedirs("PDFs", exist_ok=True)
-pdf_output = f"PDFs/{selected_run_type.upper()}_rosenbluth_separation_{target_abbrev}.pdf"
+pdf_output = f"PDFs/{selected_run_type.upper()}_rosenbluth_separation_phase{phase}_{target_abbrev}.pdf"
 pp = PdfPages(pdf_output)
 
 # -----------------------------------------------------
@@ -174,6 +182,6 @@ with PdfPages(pdf_output) as pp:
 
 print(f"PDF saved to {pdf_output}")
 
-csv_output = f"CSVs/{selected_run_type.upper()}_rosenbluth_fit_{target_abbrev}.csv"
+csv_output = f"CSVs/{selected_run_type.upper()}_rosenbluth_fit_phase{phase}_{target_abbrev}.csv"
 pd.DataFrame(fit_results).to_csv(csv_output, index=False)
 print(f"CSV of fits saved to {csv_output}")

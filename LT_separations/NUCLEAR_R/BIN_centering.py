@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# -----------------------------------------------------
+# Bin centering of cross sections to converge on central x, Q2
+# To be used as part of larger analysis framework for the extraction
+# of R = sigma_L / sigma_T in DIS
+# -----------------------------------------------------
+
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 import uproot
@@ -13,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_data_cuts, get_common_values
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
@@ -21,10 +27,12 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bin
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_target(arg2)
 nbins = parse_bins(arg3)
+phase = parse_phase(arg4)
 
 vals = get_common_values()
 ebeam_4pass = vals["ebeam_4pass"]
@@ -38,13 +46,16 @@ xsec_dir = "../../XSEC/FORM_xsec"
 
 beam_passes = ["4pass", "5pass"]
 
+if phase == "II":
+    beam_passes.insert(0, "3pass")
+
 # -----------------------------------------------------
 # Collecting extracted XSECs
 # -----------------------------------------------------
 csv_files = []
 
 for beam_pass in beam_passes:
-    csv_files.append(f"{xsec_dir}/{target_abbrev.upper()}/XSEC_{selected_run_type}_{beam_pass}_{target_abbrev}.csv")
+    csv_files.append(f"{xsec_dir}/{target_abbrev.upper()}/XSEC_{selected_run_type}_{beam_pass}_phase{phase}_{target_abbrev}.csv")
 
 all_rows = []
 
@@ -55,19 +66,31 @@ for filepath in csv_files:
 
     df = pd.read_csv(filepath)
 
-    m = re.search(r'_(\d)pass_', os.path.basename(filepath))
+    m = re.search(r'_(\d)pass_phase', os.path.basename(filepath))
     if m:
         pass_label = m.group(1)
     else:
         print(f"Could not determine pass from filename: {filepath}, defaulting to unknown.")
         pass_label = "???"
 
-    if int(pass_label) == 4:
-        ebeam = ebeam_4pass
-        theta = theta_4pass
+    if int(pass_label) == 3:
+        if phase == "II":
+            ebeam = vals["ebeam_3pass_phaseII"]
+            theta = vals["angle_3pass_phaseII"]
+    elif int(pass_label) == 4:
+        if phase == "I":
+            ebeam = vals["ebeam_4pass"]
+            theta = vals["angle_4pass"]
+        elif phase == "II":
+            ebeam = vals["ebeam_4pass_phaseII"]
+            theta = vals["angle_4pass_phaseII"]
     elif int(pass_label) == 5:
-        ebeam = ebeam_5pass
-        theta = theta_5pass
+        if phase == "I":
+            ebeam = vals["ebeam_5pass"]
+            theta = vals["angle_5pass"]
+        elif phase == "II":
+            ebeam = vals["ebeam_5pass_phaseII"]
+            theta = vals["angle_5pass_phaseII"]
 
     # A,Z,eprime,theta,xbj,q2,w,epsilon,modelxsec,xsec_exp,xsec_exp_err
 
@@ -86,7 +109,7 @@ for filepath in csv_files:
 
 df_data = pd.concat(all_rows, ignore_index=True)
 
-output_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_{target_abbrev}.csv"
+output_csv = f"CSVs/{selected_run_type.upper()}_bin_centered_phase{phase}_{target_abbrev}.csv"
 
 # -----------------------------------------------------
 # Determining the bin centers
@@ -203,14 +226,28 @@ print(df_bins)
 model_results = []
 
 for beam_pass in beam_passes:
-    if beam_pass == "4pass":
-        theta_inp = theta_4pass
-        ebeam = ebeam_4pass
-    if beam_pass == "5pass":
-        theta_inp = theta_5pass
-        ebeam = ebeam_5pass
+
+    if beam_pass == "3pass":
+        ebeam = vals["ebeam_3pass_phaseII"]
+        theta_inp = vals["angle_3pass_phaseII"]
+
+    elif beam_pass == "4pass":
+        if phase == "I":
+            theta_inp = theta_4pass
+            ebeam = ebeam_4pass
+        elif phase == "II":
+            theta_inp = vals["angle_4pass_phaseII"]
+            ebeam = vals["ebeam_4pass_phaseII"]
+
+    elif beam_pass == "5pass":
+        if phase == "I":
+            theta_inp = theta_5pass
+            ebeam = ebeam_5pass
+        elif phase == "II":
+            theta_inp = vals["angle_5pass_phaseII"]
+            ebeam = vals["ebeam_5pass_phaseII"]
         
-    infile_name = f"{selected_run_type}_{beam_pass}_{target_abbrev}"
+    infile_name = f"{selected_run_type}_{beam_pass}_phase{phase}_{target_abbrev}"
 
     # The input string depends on the version of Dave's xsec tool, mc-single-arm/util/dis_xec/calc_dis_xsec
     # Right now, the input string is flag (0 = fixed theta, bin in eprime; 1 = fixed theta, bin in xbj; 2 = fixed Q2, bin in xbj...
@@ -353,22 +390,59 @@ print(f"bc_corr range: {df_final['bc_corr'].min():.6f} → {df_final['bc_corr'].
 # -----------------------------------------------------
 # Plotting
 # -----------------------------------------------------
-plt.figure()
+# plt.figure()
 
-unique_bins = sorted(df_data["bin_num"].unique())
+# unique_bins = sorted(df_data["bin_num"].unique())
+
+# if nbins != 1:
+#     plt.axvspan(overlap_min, overlap_max, color="lightskyblue", alpha=0.1, label="Overlap Region")
+# else:
+#     plt.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
+
+# plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*",label="Bin centers", s=64)
+
+# for bin_num in unique_bins:
+#     mask = df_data["bin_num"] == bin_num
+#     plt.scatter(df_data.loc[mask, "xbj"],df_data.loc[mask, "q2"], label=f"Bin {bin_num}", s=12)
+
+# for i in range(1, len(edges)-1):
+#     if i == 1:
+#         plt.axvline(edges[i], ls="--", color="red", alpha=0.8, label="Bin Edges")
+#     else:
+#         plt.axvline(edges[i], ls="--", color="red", alpha=0.8)
+
+# plt.xlabel(r"x$_{bj}$")
+# plt.ylabel(r"Q$^2$")
+# plt.title(f"{target_longname} Binning Test (nbins={nbins})")
+
+# plt.legend()
+# plt.grid(axis="both", linestyle="--", alpha=0.8)
+
+# plt.savefig(f"PNGs/{selected_run_type}_{target_abbrev}_phase{phase}_binning_test.png")
+
+# # plt.show()
+
+# plt.close()
+
+print("\n===== PLOT DATA =====")
+print(df_data.groupby("setting").size())
+print("====================")
+
+plt.figure()
 
 if nbins != 1:
     plt.axvspan(overlap_min, overlap_max, color="lightskyblue", alpha=0.1, label="Overlap Region")
 else:
     plt.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
 
-plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*",label="Bin centers", s=64)
+plt.scatter(df_data["bc_xbj"], df_data["bc_q2"], marker="*", label="Bin centers", s=64)
 
-for bin_num in unique_bins:
-    mask = df_data["bin_num"] == bin_num
-    plt.scatter(df_data.loc[mask, "xbj"],df_data.loc[mask, "q2"], label=f"Bin {bin_num}", s=12)
+settings = df_data["setting"].unique()
+for setting in settings:
+    mask = df_data["setting"] == setting
+    plt.scatter(df_data.loc[mask, "xbj"], df_data.loc[mask, "q2"], label=setting, s=12)
 
-for i in range(1, len(edges)-1):
+for i in range(1, len(edges) - 1):
     if i == 1:
         plt.axvline(edges[i], ls="--", color="red", alpha=0.8, label="Bin Edges")
     else:
@@ -376,17 +450,11 @@ for i in range(1, len(edges)-1):
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{target_longname} Binning Test (nbins={nbins})")
-
+plt.title(f"{target_longname} Phase {phase} Binning Test (nbins={nbins})")
 plt.legend()
 plt.grid(axis="both", linestyle="--", alpha=0.8)
-
-plt.savefig(f"PNGs/{selected_run_type}_{target_abbrev}_binning_test.png")
-
-# plt.show()
-
+plt.savefig(f"PNGs/{selected_run_type}_{target_abbrev}_phase{phase}_binning_test.png")
 plt.close()
-    
 
 
 

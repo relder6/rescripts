@@ -25,10 +25,9 @@ target_abbrev, target_longname, target_shortname, target_A, target_Z = parse_tar
 phase = parse_phase(arg4)
 
 input_settings_filepath = f"../FILTER_type/{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
-histo_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_H_gtr_dp_histo.csv"
-err_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_H_gtr_dp_err.csv"
+histo_filepath = f"../XSEC/MAKE_csvs/{target_abbrev.upper()}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
 
-required_files = [input_settings_filepath, histo_filepath, err_filepath]
+required_files = [input_settings_filepath, histo_filepath]
 for f in required_files:
     if not os.path.exists(f):
         print(f"Required file missing: {f}")
@@ -45,23 +44,52 @@ output_scaler_csv_filepath = f"{output_csv_dir}/scaler_yields_{selected_run_type
 
 pdf_filepath = f"{output_pdf_dir}/YIELD_check_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.pdf"
 
-df_yield = pd.read_csv(histo_filepath)
-df_err = pd.read_csv(err_filepath)
-df_yield = df_yield[df_yield["polarity"] != "mc"].copy()
-df_err = df_err[df_err["polarity"] != "mc"].copy()
+df_histo = pd.read_csv(histo_filepath)
 
-df_yield.iloc[:, 3:] = df_yield.iloc[:, 3:].div(df_yield["charge"], axis=0).mul(1000)
-df_err.iloc[:, 3:] = df_err.iloc[:, 3:].div(df_err["charge"], axis=0).mul(1000)
+df_yield = df_histo[(df_histo["variable"] == "H_gtr_dp") & (df_histo["type"] == "data")].copy()
+df_err = df_histo[(df_histo["variable"] == "H_gtr_dp") & (df_histo["type"] == "err")].copy()
 
-df = df_yield[["runnum", "charge", "polarity"]].copy()
-df["yield"] = df_yield.iloc[:, 3:].sum(axis=1)
-df["yield_err"] = np.sqrt((df_err.iloc[:, 3:] ** 2).sum(axis=1))
+nbins = int(df_yield["nbins"].iloc[0])
+bin_columns = [f"bin{i}" for i in range(nbins)]
 
-df_input = pd.read_csv(input_settings_filepath, usecols=["runnum", "ibeam", "qbeam", "elclean_counts", "hms_p"])
+print("\nERROR DEBUG")
+print("df_err rows:", len(df_err))
+print("df_err charge:")
+print(df_err["charge"])
+print("df_err bins:")
+print(df_err[["runnum", "charge"] + bin_columns].to_string())
+print("numeric error bins:")
+print(df_err[bin_columns].apply(pd.to_numeric, errors="coerce").describe())
+
+# Charge normalization
+df_yield[bin_columns] = df_yield[bin_columns].div(df_yield["charge"], axis=0).mul(1000)
+df_err[bin_columns] = df_err[bin_columns].div(df_err["charge"], axis=0).mul(1000)
+print("\nNORMALIZED ERROR DEBUG")
+print(df_err[["runnum", "charge"] + bin_columns].to_string())
+print("\nyield_err calculation:")
+print(np.sqrt((df_err[bin_columns] ** 2).sum(axis=1)))
+
+df = df_yield[["runnum", "charge", "current", "polarity"]].copy()
+
+df["yield"] = df_yield[bin_columns].sum(axis=1)
+df["yield_err"] = np.sqrt((df_err[bin_columns] ** 2).sum(axis=1)).to_numpy()
+
+print("\nTRACKED DEBUG")
+print("df rows:", len(df))
+print("polarity:")
+print(df["polarity"].value_counts(dropna=False))
+print("yield:")
+print(df["yield"].describe())
+print("yield_err:")
+print(df["yield_err"].describe())
+print("yield_err > 0:", (df["yield_err"] > 0).sum())
+print(df[["runnum", "charge", "current", "polarity", "yield", "yield_err"]].head())
+
+df_input = pd.read_csv(input_settings_filepath, usecols=["runnum", "qbeam_2", "ibeam_2", "elclean_counts", "hms_p"])
 df_input = df_input.assign(
     runnum=pd.to_numeric(df_input["runnum"], errors="coerce"),
-    qbeam=pd.to_numeric(df_input["qbeam"], errors="coerce"),
-    ibeam=pd.to_numeric(df_input["ibeam"], errors="coerce"),
+    qbeam=pd.to_numeric(df_input["qbeam_2"], errors="coerce"),
+    ibeam=pd.to_numeric(df_input["ibeam_2"], errors="coerce"),
     elclean_counts=pd.to_numeric(df_input["elclean_counts"], errors="coerce"),
     hms_p=pd.to_numeric(df_input["hms_p"], errors="coerce"),
 )
@@ -71,7 +99,6 @@ df_input["runnum"] = df_input["runnum"].astype(int)
 df["runnum"] = pd.to_numeric(df["runnum"], errors="coerce")
 df = df.dropna(subset=["runnum"]).copy()
 df["runnum"] = df["runnum"].astype(int)
-df = df.merge(df_input[["runnum", "ibeam"]], on="runnum", how="left")
 
 df["target"] = target_abbrev
 df["beampass"] = selected_beam_pass
@@ -218,7 +245,7 @@ with PdfPages(pdf_filepath) as pdf:
     # -------------------------------------------------
     fig, (ax_top, ax_bot) = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 1], "hspace": 0},sharex=True)
 
-    fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Electron Yield vs Run Number")
+    fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Phase{phase}\nCharge Normalized Electron Yield vs Run Number")
 
     ax_top.axhline(elec_p0, linestyle="-", color="cornflowerblue", linewidth=2.0, label="Tracked $p_0$ fit", zorder=1)
     ax_top.axhline(elec_p0*1.01, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ + 1%")
@@ -254,13 +281,13 @@ with PdfPages(pdf_filepath) as pdf:
     # -------------------------------------------------
     fig, (ax_top, ax_bot) = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 1], "hspace": 0},sharex=True)
 
-    fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Electron Yield vs Beam Current", y=0.98)
+    fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Phase{phase}\nCharge Normalized Electron Yield vs Beam Current", y=0.98)
 
     ax_top.axhline(elec_current_p0, linestyle="-", color="cornflowerblue", linewidth=2.0, label="Tracked $p_0$ fit", zorder=1)
     ax_top.axhline(elec_current_p0*1.01, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ + 1%")
     ax_top.axhline(elec_current_p0*0.99, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ - 1%")
 
-    ax_top.errorbar(elec_df["ibeam"].to_numpy(), elec_df["yield"].to_numpy(), yerr=elec_df["yield_err"].to_numpy(), fmt="o",  color="navy", label="Tracked", zorder=2)
+    ax_top.errorbar(elec_df["current"].to_numpy(), elec_df["yield"].to_numpy(), yerr=elec_df["yield_err"].to_numpy(), fmt="o",  color="navy", label="Tracked", zorder=2)
     ax_top.set_ylabel("Electron Tracked Yield")
     ax_top.text(0.02, 0.95, f"$\\chi^2/ndf$ = {elec_current_chi2_ndf: .2f}", transform=ax_top.transAxes, verticalalignment="top")
     ax_top.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
@@ -283,12 +310,12 @@ with PdfPages(pdf_filepath) as pdf:
     if have_positrons:
         fig, (ax_top, ax_bot) = plt.subplots(2, 1,gridspec_kw={"height_ratios": [1, 1], "hspace": 0.01},sharex=True)
 
-        fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Positron Yield vs Run Number", y=0.98)
+        fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Phase{phase}\nCharge Normalized Positron Yield vs Run Number", y=0.98)
 
         ax_top.axhline(pos_p0, linestyle="-", color="cornflowerblue", linewidth=2.0, label="Tracked $p_0$ fit", zorder=1)
         ax_top.axhline(pos_p0*1.01, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ + 1%", zorder=1)
         ax_top.axhline(pos_p0*0.99, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ - 1%", zorder=1)
-        ax_top.errorbar(x_idx_pos, pos_df["yield"].to_numpy(), yerr=pos_df["yield_err"].to_numpy(), fmt="o",  color="red", label="Tracked", zorder=2)
+        ax_top.errorbar(x_idx_pos, pos_df["yield"].to_numpy(), yerr=pos_df["yield_err"].to_numpy(), fmt="o",  color="navy", label="Tracked", zorder=2)
         ax_top.set_ylabel("Positron Tracked Yield")
         ax_top.text(0.02, 0.95, f"$\\chi^2/ndf$ = {pos_chi2_ndf: .2f}", transform=ax_top.transAxes, ha="left", va="top")
         ax_top.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
@@ -297,7 +324,7 @@ with PdfPages(pdf_filepath) as pdf:
         ax_bot.axhline(scaler_pos_p0, linestyle="-", color="darkred", linewidth=2.0, label="Scaler $p_0$ fit", zorder=1)
         ax_bot.axhline(scaler_pos_p0*1.01, linestyle="--", color="darkred", linewidth=1.5, label="Scaler $p_0$ + 1%", zorder=1)
         ax_bot.axhline(scaler_pos_p0*0.99, linestyle="--", color="darkred", linewidth=1.5, label="Scaler $p_0$ fit - 1%", zorder=1)
-        ax_bot.errorbar(scaler_x_idx_pos, scaler_pos_df["scaler_yield"].to_numpy(), yerr=scaler_pos_df["scaler_err"].to_numpy(), fmt="o", color="orange", label="Scaler", zorder=2)
+        ax_bot.errorbar(scaler_x_idx_pos, scaler_pos_df["scaler_yield"].to_numpy(), yerr=scaler_pos_df["scaler_err"].to_numpy(), fmt="o", color="red", label="Scaler", zorder=2)
         ax_bot.set_xticks(x_idx_pos)
         ax_bot.set_xticklabels(pos_df["runnum"].astype(str), rotation=45)
         ax_bot.set_ylabel("Positron Scaler Yield")
@@ -311,13 +338,13 @@ with PdfPages(pdf_filepath) as pdf:
         # -------------------------------------------------
         fig, (ax_top, ax_bot) = plt.subplots(2, 1,gridspec_kw={"height_ratios": [1, 1], "hspace": 0.01},sharex=True)
 
-        fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Positron Yield vs Beam Current", y=0.98)
+        fig.suptitle(f"{selected_run_type.upper()} {selected_beam_pass}Pass {target_longname} Phase{phase}\nCharge Normalized Positron Yield vs Beam Current", y=0.98)
 
         ax_top.axhline(pos_current_p0, linestyle="-", color="cornflowerblue", linewidth=2.0, label="Tracked $p_0$ fit", zorder=1)
         ax_top.axhline(pos_current_p0*1.01, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ + 1%", zorder=1)
         ax_top.axhline(pos_current_p0*0.99, linestyle="--", color="cornflowerblue", linewidth=1.5, label="Tracked $p_0$ - 1%", zorder=1)
         
-        ax_top.errorbar(pos_df["ibeam"].to_numpy(), pos_df["yield"].to_numpy(), yerr=pos_df["yield_err"].to_numpy(), fmt="o",  color="red", label="Tracked", zorder=2)
+        ax_top.errorbar(pos_df["current"].to_numpy(), pos_df["yield"].to_numpy(), yerr=pos_df["yield_err"].to_numpy(), fmt="o",  color="navy", label="Tracked", zorder=2)
         ax_top.set_ylabel("Positron Tracked Yield")
         ax_top.text(0.02, 0.95, f"$\\chi^2/ndf$ = {pos_current_chi2_ndf: .2f}", transform=ax_top.transAxes, ha="left", va="top")
         ax_top.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
@@ -327,7 +354,7 @@ with PdfPages(pdf_filepath) as pdf:
         ax_bot.axhline(scaler_pos_current_p0*1.01, linestyle="--", color="darkred", linewidth=1.5, label="Scaler $p_0$ + 1%", zorder=1)
         ax_bot.axhline(scaler_pos_current_p0*0.99, linestyle="--", color="darkred", linewidth=1.5, label="Scaler $p_0$ fit", zorder=1)
         
-        ax_bot.errorbar(scaler_pos_df["ibeam"].to_numpy(), scaler_pos_df["scaler_yield"].to_numpy(), yerr=scaler_pos_df["scaler_err"].to_numpy(), fmt="o", color="orange", label="Scaler", zorder=2)
+        ax_bot.errorbar(scaler_pos_df["ibeam"].to_numpy(), scaler_pos_df["scaler_yield"].to_numpy(), yerr=scaler_pos_df["scaler_err"].to_numpy(), fmt="o", color="red", label="Scaler", zorder=2)
         ax_bot.set_ylabel("Positron Scaler Yield")
         ax_bot.set_xlabel("Beam Current (µA)")
         ax_bot.text(0.02, 0.95, f"$\\chi^2/ndf$ = {scaler_pos_chi2_ndf: .2f}", transform=ax_bot.transAxes, ha="left", va="top")

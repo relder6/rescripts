@@ -13,7 +13,7 @@ from INIT.config import get_data_cuts, get_common_values
 from scipy.optimize import curve_fit
 from collections import defaultdict
 import mplhep
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins, parse_phase
 
 # -----------------------------------------------------
 # Handling user inputs
@@ -23,20 +23,18 @@ USING_SYST_ERR_EST = True
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
+arg4 = sys.argv[4] if len(sys.argv) > 4 else None
 
 selected_run_type = parse_run_type(arg1)
 num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg2)
 denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg3)
+phase = parse_phase(arg4)
 
 A_ratio = num_A / denom_A
 num_N = num_A - num_Z
 denom_N = denom_A - denom_Z
 
 vals = get_common_values()
-ebeam_4pass = vals["ebeam_4pass"]
-theta_4pass = vals["angle_4pass"]
-ebeam_5pass = vals["ebeam_5pass"]
-theta_5pass = vals["angle_5pass"]
 
 model_xsec_dir = "../../../mc-single-arm/util/dis_xec"
 
@@ -45,11 +43,10 @@ xsec_ratio_dir = "../../XSEC/FORM_xsec/RATIOS"
 beam_passes = ["4pass", "5pass"]
 
 os.makedirs("CSVs", exist_ok=True)
-bc_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_abbrev}_to_{denom_abbrev}.csv"
+bc_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_phase{phase}_{num_abbrev}_to_{denom_abbrev}.csv"
 
 os.makedirs("PDFs", exist_ok=True)
-pdf_output = f"PDFs/DELTA_R_{selected_run_type.upper()}_rosenbluth_separation_{num_abbrev}_to_{denom_abbrev}.pdf"
-pp = PdfPages(pdf_output)
+pdf_output = f"PDFs/DELTA_R_{selected_run_type.upper()}_rosenbluth_separation_phase{phase}_{num_abbrev}_to_{denom_abbrev}.pdf"
 
 # -----------------------------------------------------
 # Reading the csv
@@ -94,17 +91,15 @@ fit_results = []
 epsp_rows = []
 
 plt.style.use(mplhep.style.ROOT)
-plt.rcParams.update({
-    "font.family": "DejaVu Sans",
-    "mathtext.fontset": "dejavusans",
-    "mathtext.default": "regular",
-    "figure.titlesize": 14,
-    "axes.titlesize": 14,
-    "axes.labelsize": 12,
-    "legend.fontsize": 10,
-    "xtick.labelsize": 12,
-    "ytick.labelsize": 12,
-})
+plt.rcParams.update({"font.family": "DejaVu Sans",
+                     "mathtext.fontset": "dejavusans",
+                     "mathtext.default": "regular",
+                     "figure.titlesize": 14,
+                     "axes.titlesize": 14,
+                     "axes.labelsize": 12,
+                     "legend.fontsize": 10,
+                     "xtick.labelsize": 12,
+                     "ytick.labelsize": 12,})
 
 with PdfPages(pdf_output) as pp:
     for bin_num in sorted(bc_data.keys()):
@@ -155,6 +150,20 @@ with PdfPages(pdf_output) as pp:
         rat_comb = np.array(rat_comb)
         rat_err_comb = np.array(rat_err_comb)
 
+        print(f"\nBin {bin_num}")
+        print(f"epsp_comb: {epsp_comb}")
+        print(f"rat_comb: {rat_comb}")
+        print(f"rat_err_comb: {rat_err_comb}")
+
+        if not np.all(np.isfinite(epsp_comb)):
+            print("ERROR: epsp_comb contains NaN/inf")
+
+        if not np.all(np.isfinite(rat_comb)):
+            print("ERROR: rat_comb contains NaN/inf")
+
+        if not np.all(np.isfinite(rat_err_comb)):
+            print("ERROR: rat_err_comb contains NaN/inf")
+
         popt, pcov = curve_fit(modified_linear_fit, epsp_comb, rat_comb, sigma=rat_err_comb, absolute_sigma=True)
         sig_t_ratio, deltaR = popt
         sig_t_ratio_err = np.sqrt(pcov[0, 0])
@@ -185,28 +194,13 @@ with PdfPages(pdf_output) as pp:
                                                     rf"$\sigma_{{{num_shortname}}} / \sigma_{{{denom_shortname}}}"
                                                     rf" = \sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T"
                                                     rf"\left(1 + \Delta R \,\epsilon' \right)$"),)
-        # ax.plot(x_fit,y_fit,"--",color="red",label=(f"Fit Results:\n"
-        #                                             rf"$\sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T"
-        #                                             rf" = {sig_t_ratio:.3f} \pm {sig_t_ratio_err:.3f}$"
-        #                                             f"\n"
-        #                                             rf"$\Delta R = {deltaR:.3f} \pm {deltaR_err:.3f}$"),)
-        # ax.plot(x_fit, y_fit, "--", color = "red", label = "Rosenbluth fit", zorder = 11)
+
         all_rat = np.concatenate([ratio_raw, ratio_bc, rat_comb])
                 
         y_min, y_max = all_rat.min(), all_rat.max()
                 
-        # margin = 0.1
-        # dy = margin * (y_max - y_min if y_max > y_min else 1.0)
-        # ax.set_xlim(epsp_min - 0.05, epsp_max + 0.05)
-        # ax.set_ylim(y_min - dy, y_max + dy)
-
-        # ax.set_title(
-        #     rf"Rosenbluth Separation of $\Delta R = R_{{{num_shortname}}} - R_{{{denom_shortname}}}$ "
-        #     f"($x_{{bj}} = {xbjavg:.3f},\ Q^2 = {q2avg:.3f}$)"
-        #     f"\n$\Delta R = {deltaR:.3f} \pm {deltaR_err:.3f}$\t\t"
-        #     rf"$\sigma_{{{num_shortname}}}^T / \sigma_{{{denom_shortname}}}^T = {sig_t_ratio:.3f} \pm {sig_t_ratio_err:.3f}$",)
         ax.set_title(
-            rf"Rosenbluth Separation of $\Delta R = R_{{{num_shortname}}} - R_{{{denom_shortname}}}$ "
+            rf"Rosenbluth Separation of Phase {phase} $\Delta R = R_{{{num_shortname}}} - R_{{{denom_shortname}}}$ "
             f"\n$x_{{bj}} = {xbjavg:.3f},\ Q^2 = {q2avg:.3f}$",)
         ax.set_xlabel(r"$\epsilon$'")
         ax.set_ylabel(rf"$\sigma_{{{num_shortname}}} / \sigma_{{{denom_shortname}}}$")
@@ -237,6 +231,6 @@ with PdfPages(pdf_output) as pp:
         plt.close(fig)
 
 print(f"PDF saved to {pdf_output}")
-csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_{num_abbrev}_to_{denom_abbrev}.csv"
+csv_output = f"CSVs/DELTA_R_{selected_run_type.upper()}_rosenbluth_fit_phase{phase}_{num_abbrev}_to_{denom_abbrev}.csv"
 pd.DataFrame(fit_results).to_csv(csv_output, index=False)
 print(f"CSV of fits saved to {csv_output}")

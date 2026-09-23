@@ -13,33 +13,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)    
 from INIT.config import get_data_cuts, get_common_values
-from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins
+from INIT.config import parse_run_type, parse_beam_pass, parse_target, parse_bins, parse_phase
 import mplhep
 
 # -----------------------------------------------------
 # Handling user inputs, listing directories
 # -----------------------------------------------------
-R_ld2 = 0.23917591490972823
+# R_ld2 = 0.23917591490972823
 
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
 arg2 = sys.argv[2] if len(sys.argv) > 2 else None
 arg3 = sys.argv[3] if len(sys.argv) > 3 else None
 arg4 = sys.argv[4] if len(sys.argv) > 4 else None
+arg5 = sys.argv[5] if len(sys.argv) > 5 else None
 
 selected_run_type = parse_run_type(arg1)
 num_abbrev, num_longname, num_shortname, num_A, num_Z = parse_target(arg2)
 denom_abbrev, denom_longname, denom_shortname, denom_A, denom_Z = parse_target(arg3)
 nbins = parse_bins(arg4)
+phase = parse_phase(arg5)
 
 A_ratio = num_A / denom_A
 num_N = num_A - num_Z
 denom_N = denom_A - denom_Z
 
 vals = get_common_values()
-ebeam_4pass = vals["ebeam_4pass"]
-theta_4pass = vals["angle_4pass"]
-ebeam_5pass = vals["ebeam_5pass"]
-theta_5pass = vals["angle_5pass"]
 
 model_xsec_dir = "../../../mc-single-arm/util/dis_xec"
 
@@ -47,13 +45,28 @@ xsec_ratio_dir = "../../XSEC/FORM_xsec/RATIOS"
 
 beam_passes = ["4pass", "5pass"]
 
+if phase == "II":
+    beam_passes.insert(0, "3pass")
+
+
+# -----------------------------------------------------
+# Reading in R_ld2 based on the run phase
+# -----------------------------------------------------
+R_dir = "/work/hallc/c-rsidis/relder/rescripts/LT_separations/NUCLEAR_R/CSVs"
+R_file = f"{R_dir}/HMSDIS_rosenbluth_fit_phase{phase}_ld2.csv"
+
+df_R = pd.read_csv(R_file)
+R_ld2 = float(df_R.loc[0, "R"])
+R_ld2_err = float(df_R.loc[0, "R_err"])
+print(f"Using LD2 R = {R_ld2:.8g} +/- {R_ld2_err:.3g} from {R_file}")
+
 # -----------------------------------------------------
 # Collecting extracted XSECs
 # -----------------------------------------------------
 csv_files = []
 
 for beam_pass in beam_passes:
-    csv_files.append(f"{xsec_ratio_dir}/XSEC_RATIO_{selected_run_type}_{beam_pass}_{num_abbrev}_to_{denom_abbrev}.csv")
+    csv_files.append(f"{xsec_ratio_dir}/XSEC_RATIO_{selected_run_type}_{beam_pass}_phase{phase}_{num_abbrev}_to_{denom_abbrev}.csv")
 
 all_rows = []
 
@@ -71,12 +84,24 @@ for filepath in csv_files:
         print(f"Could not determine pass from filename: {filepath}, defaulting to unknown.")
         pass_label = "???"
 
-    if int(pass_label) == 4:
-        ebeam = ebeam_4pass
-        theta = theta_4pass
+    if int(pass_label) == 3:
+        if phase == "II":
+            ebeam = vals["ebeam_3pass_phaseII"]
+            theta = vals["angle_3pass_phaseII"]
+    elif int(pass_label) == 4:
+        if phase == "I":
+            ebeam = vals["ebeam_4pass"]
+            theta = vals["angle_4pass"]
+        elif phase == "II":
+            ebeam = vals["ebeam_4pass_phaseII"]
+            theta = vals["angle_4pass_phaseII"]
     elif int(pass_label) == 5:
-        ebeam = ebeam_5pass
-        theta = theta_5pass
+        if phase == "I":
+            ebeam = vals["ebeam_5pass"]
+            theta = vals["angle_5pass"]
+        elif phase == "II":
+            ebeam = vals["ebeam_5pass_phaseII"]
+            theta = vals["angle_5pass_phaseII"]
 
     # A,Z,eprime,theta,xbj,q2,w,epsilon,modelxsec,xsec_exp,xsec_exp_err
 
@@ -100,7 +125,7 @@ for filepath in csv_files:
 
 df_data = pd.concat(all_rows, ignore_index=True)
 
-output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_{num_abbrev}_to_{denom_abbrev}.csv"
+output_csv = f"CSVs/DELTA_R_{selected_run_type.upper()}_bin_centered_phase{phase}_{num_abbrev}_to_{denom_abbrev}.csv"
 
 # -----------------------------------------------------
 # Determining the bin centers
@@ -217,15 +242,29 @@ print(df_bins)
 model_results = []
 
 for beam_pass in beam_passes:
-    if beam_pass == "4pass":
-        theta_inp = theta_4pass
-        ebeam = ebeam_4pass
-    if beam_pass == "5pass":
-        theta_inp = theta_5pass
-        ebeam = ebeam_5pass
 
-    infile_names = {"bc_num": f"{selected_run_type}_{beam_pass}_{num_abbrev}",
-                    "bc_denom": f"{selected_run_type}_{beam_pass}_{denom_abbrev}"}
+    if beam_pass == "3pass":
+        theta_inp = vals["angle_3pass_phaseII"]
+        ebeam = vals["ebeam_3pass_phaseII"]
+
+    elif beam_pass == "4pass":
+        if phase == "I":
+            theta_inp = vals["angle_4pass"]
+            ebeam = vals["ebeam_4pass"]
+        elif phase == "II":
+            theta_inp = vals["angle_4pass_phaseII"]
+            ebeam = vals["ebeam_4pass_phaseII"]
+
+    elif beam_pass == "5pass":
+        if phase == "I":
+            theta_inp = vals["angle_5pass"]
+            ebeam = vals["ebeam_5pass"]
+        elif phase == "II":
+            theta_inp = vals["angle_5pass_phaseII"]
+            ebeam = vals["ebeam_5pass_phaseII"]
+
+    infile_names = {"bc_num": f"{selected_run_type}_{beam_pass}_phase{phase}_{num_abbrev}",
+                    "bc_denom": f"{selected_run_type}_{beam_pass}_phase{phase}_{denom_abbrev}"}
 
     # The input string depends on the version of Dave's xsec tool, mc-single-arm/util/dis_xec/calc_dis_xsec
     # Right now, the input string is flag (0 = fixed theta, bin in eprime; 1 = fixed theta, bin in xbj; 2 = fixed Q2, bin in xbj...
@@ -364,12 +403,17 @@ df_data["bc_xsec_ratio_err"] = df_data["xsec_ratio_err"] * df_data["bc_corr"]
 
 df_data["epsilon_p"] = df_data["epsilon"] / (1 + df_data["epsilon"] * R_ld2)
 
+df_data["R_ld2"] = R_ld2
+
+df_data["R_ld2_err"] = R_ld2_err
+
 col_final = ["setting", "num_A", "num_Z", "denom_A", "denom_Z", "ebeam", "theta", "theta_rad", "eprime", "xbj",
              "q2", "w2", "epsilon", "epsilon_p", "xsec_exp_num", "xsec_exp_err_num", "xsec_exp_denom", "xsec_exp_err_denom",
              "xsec_ratio", "xsec_ratio_err",
              "bin_num", "bc_xsec_model_num", "bc_xsec_model_denom", "bc_corr",
              "bc_xbj", "bc_q2", "bc_nu", "bc_epsilon", "bc_epsilon_p", "bc_gamma",
-             "bc_xsec_ratio", "bc_xsec_ratio_err"]
+             "bc_xsec_ratio", "bc_xsec_ratio_err",
+             "R_ld2", "R_ld2_err"]
 
 df_final = df_data[col_final]
 
@@ -441,16 +485,28 @@ fig, ax = plt.subplots(figsize=(6.5, 5),constrained_layout=True)
 
 unique_bins = sorted(df_data["bin_num"].unique())
 
-if nbins != 1:
-    ax.axvspan(overlap_min, overlap_max, color="lightgrey", alpha=0.1, label="Overlap Region")
-else:
-    ax.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
+# if phase == "I":
+#     ebeam_colors = {vals["ebeam_4pass"]: "royalblue",
+#                     vals["ebeam_5pass"]: "seagreen",}
+# else:
+#     ebeam_colors = {vals["ebeam_3pass_phaseII"]: "firebrick",
+#                     vals["ebeam_4pass_phaseII"]: "royalblue",
+#                     vals["ebeam_5pass_phaseII"]: "seagreen",}
 
-plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*", color = "red", label="Bin centers", s=64)
+# if nbins != 1:
+#     ax.axvspan(overlap_min, overlap_max, color="lightgrey", alpha=0.1, label="Overlap Region")
+# else:
+#     ax.axvspan(x_min, x_max, color="lightskyblue", alpha=0.1, label="Data Range")
+
+plt.scatter(df_data["bc_xbj"],df_data["bc_q2"], marker="*", color = "#FF8200", edgecolor = "black", label="Bin centers", s=56, zorder=10)
 
 for bin_num in unique_bins:
     mask = df_data["bin_num"] == bin_num
-    ax.scatter(df_data.loc[mask, "xbj"],df_data.loc[mask, "q2"], color = "navy", label=f"Bin {bin_num}", s=12)
+
+    for ebeam in sorted(df_data["ebeam"].unique()):
+        pass_mask = mask & (df_data["ebeam"] ==  ebeam)
+        
+        ax.scatter(df_data.loc[pass_mask, "xbj"],df_data.loc[pass_mask, "q2"], label=f"Ebeam = {ebeam:.4f} GeV" if bin_num == unique_bins[0] else None, s=12)
 
 for i in range(1, len(edges)-1):
     if i == 1:
@@ -460,12 +516,12 @@ for i in range(1, len(edges)-1):
 
 plt.xlabel(r"x$_{bj}$")
 plt.ylabel(r"Q$^2$")
-plt.title(f"{num_longname}/{denom_longname} Bin Centering Kinematics (nbins={nbins})")
+plt.title(f"{num_longname}/{denom_longname} Phase {phase}\nKinematic Bin Centering (nbins={nbins})")
 
 plt.legend(loc="upper left", frameon = True, fancybox = True, framealpha=0.6,edgecolor="gray")
 plt.grid(axis="both", linestyle="--", alpha=0.8)
 
-plt.savefig(f"PNGs/{selected_run_type}_{num_abbrev}_to_{denom_abbrev}_binning_test.png")
+plt.savefig(f"PNGs/{selected_run_type}_{num_abbrev}_to_{denom_abbrev}_phase{phase}_binning_test.png")
 
 #plt.show()
 
