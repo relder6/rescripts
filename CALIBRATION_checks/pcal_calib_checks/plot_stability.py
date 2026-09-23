@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-fit_results_filepath = "CSVs/FIT_pcal_ep_results.csv"
+fit_results_filepath = "CSVs/FIT_pcal_results.csv"
 outdir = "STABILITY_plots"
 os.makedirs(outdir, exist_ok=True)
 
@@ -37,33 +37,21 @@ colors = plt.cm.tab10.colors
 momentum_colors = {mom: colors[i % len(colors)] for i, mom in enumerate(available_momenta)}
 
 def make_plot(plot_df, title_text, outfile):
-    fig, (ax_top, ax_bot) = plt.subplots(
-        nrows=2, ncols=1, figsize=(8, 8),
-        gridspec_kw={"height_ratios": [3, 1]}
-    )
+    fig, (ax_top, ax_bot) = plt.subplots(nrows=2, ncols=1, figsize=(8, 8),gridspec_kw={"height_ratios": [3, 1]})
 
     for mom in sorted(plot_df["momentum"].unique()):
         momdf = plot_df[plot_df["momentum"] == mom]
         color = momentum_colors[mom]
         for rt in sorted(momdf["run_type"].unique()):
             subdf = momdf[momdf["run_type"] == rt].sort_values("runnum_int")
-            ax_top.errorbar(
-                subdf["runnum_int"].to_numpy(),
-                subdf["fit_mean"].to_numpy(),
-                yerr=subdf["mean_err"].to_numpy(),
-                fmt=type_markers.get(rt, "o"),
-                color=color,
-                capsize=0,
-                elinewidth=0.5,
-                markersize=3,
-                label=f"{mom:g} GeV, {rt}"
-            )
+            ax_top.errorbar(subdf["runnum_int"].to_numpy(),subdf["fit_mean"].to_numpy(),yerr=subdf["mean_err"].to_numpy(),fmt=type_markers.get(rt, "o"),color=color,capsize=0,elinewidth=0.5,markersize=3,label=f"{mom:g} GeV, {rt}")
 
     ax_top.axhline(1.0, color="navy", linestyle="--", linewidth=1.2, label="y = 1")
     ax_top.set_ylabel(r"$\mu_{\rm fit}$, P.cal.etottracknorm", fontsize=13)
     ax_top.set_xlabel("Run Number", fontsize=13)
     ax_top.legend(title="Momentum, Run Type", fontsize=9, ncol=2)
     ax_top.grid(True, linestyle="--", alpha=0.6)
+    ax_top.set_ylim(0.9, 1.1)
 
     res = plot_df["residual"].dropna()
     ax_bot.hist(res, bins=100, histtype="stepfilled", alpha=0.7, edgecolor="black")
@@ -84,18 +72,10 @@ def make_plot(plot_df, title_text, outfile):
     fig.savefig(outfile, dpi=300)
     plt.close(fig)
 
-make_plot(
-    df,
-    "SHMS Calorimeter Stability (All Momentum Settings)",
-    os.path.join(outdir, "all_momenta_stability_pcal.png")
-)
+make_plot(df,"SHMS Calorimeter Stability (All Momentum Settings)",os.path.join(outdir, "all_momenta_stability_pcal.png"))
 
 for mom in available_momenta:
     momdf = df[df["momentum"] == mom].copy()
-    make_plot(
-        momdf,
-        f"SHMS Calorimeter Stability ({mom:g} GeV)",
-        os.path.join(outdir, f"stability_pcal_{mom:g}GeV.png")
-    )
+    make_plot(momdf,f"SHMS Calorimeter Stability ({mom:g} GeV)",os.path.join(outdir, f"stability_pcal_{mom:g}GeV.png"))
 
 print(f"Wrote {1 + len(available_momenta)} plots to {outdir}")

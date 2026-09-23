@@ -150,7 +150,7 @@ with open(outfile, "w", newline="") as csvfile:
         ax2 = axs[0,1]
         ax3 = axs[1,0]
         ax4 = axs[1,1]
-        fig.suptitle(f"{run_type} Run {runnum}", fontsize=16, fontweight="bold")
+        fig.suptitle(f"HCAL {run_type} Run {runnum}", fontsize=16, fontweight="bold")
 
         # -----------------------------------------------------------------------------
         # Plotting normalized e/p per track at calorimeter

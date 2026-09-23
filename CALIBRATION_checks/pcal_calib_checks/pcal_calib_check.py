@@ -12,15 +12,14 @@ from scipy.optimize import curve_fit
 # --------------------------------------------------------------------------
 # Check file locations before running,
 # --------------------------------------------------------------------------
-root_directory = f"/w/hallc-scshelf2102/c-rsidis/skimfiles/pass0p1"
-bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv"
+rootfile_type = 0 #0 for full rootfile, 1 for skimfiles
 
-# Commenting out lines below because this overwrites the primary output file!  That's an issue!
-# # Parsing optional command line input for selected run numbers
+root_directory = f"/lustre24/expphy/volatile/hallc/c-rsidis/pdbforce/replay/ROOTfiles"
+bigtable_filepath = "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_phaseII.csv"
+
 parser = argparse.ArgumentParser()
 parser.add_argument("runs", nargs="*", type=int, help="Optional run numbers")
 args = parser.parse_args()
-selected_runs = set(args.runs) if args.runs else None
 
 data = np.genfromtxt(bigtable_filepath,delimiter=",",names=True,dtype=None,encoding=None)
 
@@ -33,25 +32,21 @@ run_types = data["run_type"][mask]
 shms_ps = data["shms_p"][mask]
 shms_ths = data["shms_th"][mask]
 
-if selected_runs is not None:
-    run_mask = np.isin(runnums, list(selected_runs))
-    runnums = runnums[run_mask]
-    run_types = run_types[run_mask]
-    shms_ps = shms_ps[run_mask]
-    shms_ths = shms_ths[run_mask]
-    for run in runnums:
-        outfile = f"CSVs/FIT_pcal_{run}.csv"
-
-else:
-    outfile = "CSVs/FIT_pcal_results.csv"
+outfile = "CSVs/FIT_pcal_results.csv"
 
 print(f"Found {len(runnums)} runs")
 
 # Defining some common things that will be used in every run analysis,
 d_calo_fp = 292.64 # distance from focal plane to calorimeter face
 
-branches = ["P_dc_x_fp", "P_dc_y_fp", "P_dc_xp_fp", "P_dc_yp_fp", "P_gtr_dp", "P_hgcer_npeSum", "P_ngcer_npeSum", "P_cal_etottracknorm", "P_gtr_beta"]
-data_cut = ("(P_gtr_dp > -15) & (P_gtr_dp < 27) & (P_hgcer_npeSum > 1.5) & (P_ngcer_npeSum > 1.5) & (P_gtr_beta > 0.8) & (P_gtr_beta < 1.2) & (P_cal_etottracknorm > 0)")
+branches = ["P.dc.x_fp", "P.dc.y_fp", "P.dc.xp_fp", "P.dc.yp_fp", "P.gtr.dp", "P.hgcer.npeSum", "P.ngcer.npeSum", "P.cal.etottracknorm", "P.gtr.beta"]
+data_cut = ("(P.gtr.dp > -15) & (P.gtr.dp < 27) & (P.hgcer.npeSum > 1.5) & (P.ngcer.npeSum > 1.5) & (P.gtr.beta > 0.8) & (P.gtr.beta < 1.2) & (P.cal.etottracknorm > 0)")
+
+if rootfile_type == 1:
+    branches = [branch.replace(".", "_") for branch in branches]
+    data_cut = data_cut.replace(".", "_")
+
+x_fp, y_fp, xp_fp, yp_fp, dp, hgcernpeSum, ngcernpeSum, etottracknorm, beta = branches
 
 xbins, ybins = 100, 100
 xmin, xmax = -60, 60
@@ -89,16 +84,16 @@ with open(outfile, "w", newline="") as csvfile:
     for runnum, run_type, shms_p, shms_th in zip(runnums, run_types, shms_ps, shms_ths):
         print(f"Processing run {runnum} ({run_type})")
         if run_type == "SHMSDIS":
-            skimfile = f"{root_directory}/skimmed_shms_coin_replay_production_{runnum}_-1.root"
+            root_filepath = f"{root_directory}/shms_coin_replay_production_{runnum}_-1.root"
         elif run_type == "PI-SIDIS":
-            skimfile = f"{root_directory}/skimmed_coin_replay_production_{runnum}_-1.root"
+            root_filepath = f"{root_directory}/coin_replay_production_{runnum}_-1.root"
 
-        if not os.path.exists(skimfile):
+        if not os.path.exists(root_filepath):
             print(f"ERROR:\tRun {runnum} is missing a ROOTfile; skipping...")
             continue
 
         try:
-            with uproot.open(skimfile) as rootfile:
+            with uproot.open(root_filepath) as rootfile:
                 tree = rootfile["T"]
                 arrays = tree.arrays(branches, cut=data_cut, library="np")
         except uproot.exceptions.KeyInFileError as e:
@@ -108,11 +103,11 @@ with open(outfile, "w", newline="") as csvfile:
         # --------------------------------------------------------------------------
         # Setting up variables for plotting
         # --------------------------------------------------------------------------
-        ep = arrays["P_cal_etottracknorm"]
+        ep = arrays[etottracknorm]
         
-        xcalo = (arrays["P_dc_x_fp"]) + (arrays["P_dc_xp_fp"])*d_calo_fp
+        xcalo = (arrays[x_fp]) + (arrays[xp_fp])*d_calo_fp
 
-        ycalo = (arrays["P_dc_y_fp"]) + (arrays["P_dc_yp_fp"])*d_calo_fp
+        ycalo = (arrays[y_fp]) + (arrays[yp_fp])*d_calo_fp
         
         weight = ep
         
@@ -149,8 +144,12 @@ with open(outfile, "w", newline="") as csvfile:
         # -----------------------------------------------------------------------------
         # Getting the figure ready to place both plots
         # -----------------------------------------------------------------------------
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (14, 6), constrained_layout = True)
-        fig.suptitle(f"{run_type} Run {runnum}", fontsize=16, fontweight="bold")
+        fig, axs = plt.subplots(2,2, figsize = (10, 8), constrained_layout = True)
+        ax1 = axs[0,0]
+        ax2 = axs[0,1]
+        ax3 = axs[1,0]
+        ax4 = axs[1,1]
+        fig.suptitle(f"PCAL {run_type} Run {runnum}", fontsize=16, fontweight="bold")
 
         # -----------------------------------------------------------------------------
         # Plotting normalized e/p per track at calorimeter
@@ -191,7 +190,7 @@ with open(outfile, "w", newline="") as csvfile:
         # -----------------------------------------------------------------------------
         # Plotting fitted distribution of e/p
         # -----------------------------------------------------------------------------
-        counts, bin_edges = np.histogram(arrays["P_cal_etottracknorm"], bins=data_bins)
+        counts, bin_edges = np.histogram(arrays["P.cal.etottracknorm"], bins=data_bins)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
         # Initializing fit_failed flag, several checks will be made against this to avoid wasting time fitting nothing
@@ -276,7 +275,7 @@ with open(outfile, "w", newline="") as csvfile:
                 amp_fit = mean_fit = sigma_fit = amp_err = mean_err = sigma_err = np.nan
         
         # Now plotting to the second pad
-        ax2.hist(arrays["P_cal_etottracknorm"], bins=data_bins, histtype='step', color='red', label='E/p')
+        ax2.hist(arrays[etottracknorm], bins=data_bins, histtype='step', color='red', label='E/p')
 
         if not fit_failed:
             x_plot = np.linspace(np.min(x_fit), np.max(x_fit), 500)
@@ -299,10 +298,26 @@ with open(outfile, "w", newline="") as csvfile:
         ax2.grid(alpha=0.5)
         ax2.legend()
 
+        # Now plotting to the third pad
+        h = ax3.hist2d(arrays[etottracknorm],arrays[dp],bins=[100, 100],range=[[0, 2], [-8, 8]], norm=mplcolors.LogNorm(), cmap="plasma")
+        
+        fig.colorbar(h[3], ax=ax3, pad=0.0)
+        
+        ax3.set_ylabel("P.gtr.dp")
+        ax3.set_xlabel("P.cal.etottracknorm")
+        ax3.set_title(r"$P\_gtr\_dp$ vs $P\_cal\_etottracknorm$")
+
+        # Now plotting to the fourth pad
+        h2 = ax4.hist2d(ycalo,xcalo,bins=[100, 100],range=[[ymin,ymax], [xmin, xmax]], norm=mplcolors.LogNorm(), cmap="plasma")
+        fig.colorbar(h2[3], ax=ax4, pad=0.0)
+        ax4.set_ylabel("ycalo")
+        ax4.set_xlabel("xcalo")
+        # ax4.set_title(r"$H\_gtr\_dp$ vs $H\_cal\_etottracknorm$")
+
         # --------------------------------------------------------------------------
         # Save the combined figure
         # --------------------------------------------------------------------------
-        fig.savefig(f"PNGs/{run_type}_run_{runnum}_pcal.png", dpi=150, bbox_inches="tight")
+        fig.savefig(f"PNGs/pcal_run_{runnum}.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
 
         writer.writerow([runnum,run_type,shms_p,shms_th,mean_fit,mean_err,sigma_fit,sigma_err,fit_bin_min,fit_bin_max,fit_bin_avg,fit_bin_sum])
