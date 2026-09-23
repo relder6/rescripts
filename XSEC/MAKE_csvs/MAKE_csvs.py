@@ -18,6 +18,8 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_
 # -----------------------------------------------------
 # Handling user inputs
 # -----------------------------------------------------
+rootfile_type = 0 #0 for full rootfile, 1 for skimfiles
+
 flags = get_flags()
 
 USING_DELTA_CORR = flags["USING_DELTA_CORR"]
@@ -96,85 +98,91 @@ with open(input_settings_filepath, "r", newline="") as csvfile:
 # -----------------------------------------------------
 # Defining branches, using uproot to put them in data frames
 # -----------------------------------------------------
-branches = ["H_gtr_dp", "H_cal_etottracknorm", "H_gtr_ph",
-            "H_gtr_th", "H_gtr_x", "H_gtr_y",
-            "H_kin_Q2", "H_kin_x_bj", "H_kin_W",
-            "H_cer_npeSum", "H_gtr_p",
-            "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp"]
-
 branches_mc = ["hsdelta", "q2", "xb", "w", "weight", "eprime", "hsytar", "hsxptar", "hsyptar", "hsxfp", "hsxpfp", "hsyfp", "hsypfp"]
 
-variable_mc_map = {"H_gtr_dp": "hsdelta",
-                   "H_gtr_ph": "hsyptar",
-                   "H_gtr_th": "hsxptar",
-                   "H_kin_Q2": "q2",
-                   "H_kin_x_bj": "xb",
-                   "H_kin_W": "w",
-                   "H_gtr_p": "eprime",
-                   "H_gtr_y": "hsytar",
-                   "H_gtr_th": "hsxptar",
-                   "H_gtr_ph": "hsyptar",
+branches = ["H.gtr.dp", "H.cal.etottracknorm", "H.gtr.ph",
+            "H.gtr.th", "H.gtr.x", "H.gtr.y",
+            "H.kin.Q2", "H.kin.x_bj", "H.kin.W",
+            "H_cer_npeSum", "H.gtr.p",
+            "H_dc_x_fp", "H_dc_xp_fp", "H_dc_y_fp", "H_dc_yp_fp"]
+
+variable_mc_map = {"H.gtr.dp": "hsdelta",
+                   "H.gtr.ph": "hsyptar",
+                   "H.gtr.th": "hsxptar",
+                   "H.kin.Q2": "q2",
+                   "H.kin.x_bj": "xb",
+                   "H.kin.W": "w",
+                   "H.gtr.p": "eprime",
+                   "H.gtr.y": "hsytar",
+                   "H.gtr.th": "hsxptar",
+                   "H.gtr.ph": "hsyptar",
                    "H_dc_x_fp": "hsxfp",
                    "H_dc_xp_fp": "hsxpfp",
                    "H_dc_y_fp": "hsyfp",
                    "H_dc_yp_fp": "hsypfp",
-                   "H_kin_W2": "w"}
+                   "H.kin.W2": "w"}
+
+if rootfile_type == 1:
+    branches = [branch.replace(".", "_") for branch in branches]
+    variable_mc_map = {key.replace(".", "_"): value for key, value in variable_mc_map.items()}
 
 # -----------------------------------------------------
 # Binning
 # -----------------------------------------------------
 if selected_beam_pass == "3":
-    custom_bins = {"H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
-                   "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
-                   "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
-                   "H_kin_Q2": dict(binnum = 20, min = 2.900, max = 6.000),
-                   "H_kin_x_bj": dict(binnum = 20, min = 0.2, max = 0.7),
-                   "H_kin_W": dict(binnum = 20, min = 2.000, max = 3.000),
-                   "H_gtr_p": dict(binnum = 100, min = 1.000, max = 1.400),
-                   "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
-                   "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
-                   "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
-                   "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
-                   "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-                   "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
-                   "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-                   "H_kin_W2": dict(binnum = 20, min = 4.00, max = 9.00),
-                   "H_cal_etottracknorm": dict(binnum = 100, min = 0, max = 1.50),
-                   "H_cer_npeSum": dict(binnum = 100, min = 0, max = 20)}
-
+    custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
+                   "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
+                   "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
+                   "H.kin.Q2": dict(binnum = 20, min = 2.900, max = 6.000),
+                   "H.kin.x_bj": dict(binnum = 20, min = 0.2, max = 0.7),
+                   "H.kin.W": dict(binnum = 20, min = 2.000, max = 3.000),
+                   "H.gtr.p": dict(binnum = 100, min = 1.000, max = 1.400),
+                   "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
+                   "H.gtr.th": dict(binnum = 100, min = -0.1, max = 0.1),
+                   "H.gtr.ph": dict(binnum = 100, min = -0.05, max = 0.05),
+                   "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
+                   "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+                   "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
+                   "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+                   "H.kin.W2": dict(binnum = 20, min = 4.00, max = 9.00),}
+    
 if selected_beam_pass == "4":
-    custom_bins = {"H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
-                   "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
-                   "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
-                   "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
-                   "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
-                   "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
-                   "H_gtr_p": dict(binnum = 100, min = 1.3, max = 1.8),
-                   "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
-                   "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
-                   "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
-                   "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
-                   "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-                   "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
-                   "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-                   "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),}
+    custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
+                   "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
+                   "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
+                   "H.kin.Q2": dict(binnum = 20, min = 2.400, max = 4.200),
+                   "H.kin.x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
+                   "H.kin.W": dict(binnum = 20, min = 3.100, max = 3.500),
+                   "H.gtr.p": dict(binnum = 100, min = 1.3, max = 1.8),
+                   "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
+                   "H.gtr.th": dict(binnum = 100, min = -0.1, max = 0.1),
+                   "H.gtr.ph": dict(binnum = 100, min = -0.05, max = 0.05),
+                   "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
+                   "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+                   "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
+                   "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+                   "H.kin.W2": dict(binnum = 20, min = 9.6, max = 12.3),}
     
 if selected_beam_pass == "5":
-    custom_bins = {"H_gtr_dp": dict(binnum = 20, min = -10.000, max = 10.000),
-                   "H_gtr_ph": dict(binnum = 20, min = -0.050, max = 0.050),
-                   "H_gtr_th": dict(binnum = 20, min = -0.100, max = 0.100),
-                   "H_kin_Q2": dict(binnum = 20, min = 2.400, max = 4.200),
-                   "H_kin_x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
-                   "H_kin_W": dict(binnum = 20, min = 3.100, max = 3.500),
-                   "H_gtr_p": dict(binnum = 100, min = 3.2, max = 5.2),
-                   "H_gtr_y": dict(binnum = 100, min = -4.0, max = 4.0),
-                   "H_gtr_th": dict(binnum = 100, min = -0.1, max = 0.1),
-                   "H_gtr_ph": dict(binnum = 100, min = -0.05, max = 0.05),
-                   "H_dc_x_fp": dict(binnum = 20, min = -50, max = 50),
-                   "H_dc_xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-                   "H_dc_y_fp": dict(binnum = 20, min = -30, max = 30),
-                   "H_dc_yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-                   "H_kin_W2": dict(binnum = 20, min = 9.6, max = 12.3),}
+    custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
+                   "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
+                   "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
+                   "H.kin.Q2": dict(binnum = 20, min = 2.400, max = 4.200),
+                   "H.kin.x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
+                   "H.kin.W": dict(binnum = 20, min = 3.100, max = 3.500),
+                   "H.gtr.p": dict(binnum = 100, min = 3.2, max = 5.2),
+                   "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
+                   "H.gtr.th": dict(binnum = 100, min = -0.1, max = 0.1),
+                   "H.gtr.ph": dict(binnum = 100, min = -0.05, max = 0.05),
+                   "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
+                   "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+                   "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
+                   "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
+                   "H.kin.W2": dict(binnum = 20, min = 9.6, max = 12.3),}
+
+if rootfile_type == 1:
+    custom_bins = {key.replace(".", "_"): value for key, value in custom_bins.items()}
+    
 
 # -----------------------------------------------------
 # Data histogram and csv creation
@@ -192,7 +200,10 @@ for var, bins in custom_bins.items():
     hist_err_data[var] = []
 
 for i, runnum in enumerate(runnums):
-     rootfile_path = f"{rootfile_dir}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
+     if rootfile_type == 0:
+         rootfile_path = f"{rootfile_dir}/hms_coin_replay_production_{runnum}_-1.root"
+     if rootfile_type == 1:
+         rootfile_path = f"{rootfile_dir}/skimmmed_hms_coin_replay_production_{runnum}_-1.root"
      if not os.path.exists(rootfile_path):
          print(f"WARNING: Missing {rootfile_path}, skipping...")
          continue
@@ -200,19 +211,29 @@ for i, runnum in enumerate(runnums):
      arr = tree.arrays(branches, library = "np")
      df = pd.DataFrame(arr)
      if target_abbrev not in {"dummy_up", "dummy_down"}:
-         data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                     (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
-                     (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]))
+         if rootfile_type == 0:
+             dp = df["H.gtr.dp"]
+             cer = df["H.cer.npeSum"]
+             cal = df["H.cal.etottracknorm"]
+             ytar = df["H.gtr.y"]
+         elif rootfile_type == 1:
+             dp = df["H_gtr_dp"]
+             cer = df["H_cer_npeSum"]
+             cal = df["H_cal_etottracknorm"]
+             ytar = df["H_gtr_y"]
+         data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                     (cer > cuts["H_cer_npeSum_cut"]) &
+                     (cal > cuts["H_cal_etottracknorm_cut"]))
      elif target_abbrev == "dummy_up":
-         data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                     (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
-                     (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]) &
-                     (df["H_gtr_y"] < 0))
+         data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                     (cer > cuts["H_cer_npeSum_cut"]) &
+                     (cal > cuts["H_cal_etottracknorm_cut"]) &
+                     (ytar < 0))
      elif target_abbrev == "dummy_down":
-         data_cut = (df["H_gtr_dp"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                     (df["H_cer_npeSum"] > cuts["H_cer_npeSum_cut"]) &
-                     (df["H_cal_etottracknorm"] > cuts["H_cal_etottracknorm_cut"]) &
-                     (df["H_gtr_y"] >= 0))
+         data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                     (cer > cuts["H_cer_npeSum_cut"]) &
+                     (cal > cuts["H_cal_etottracknorm_cut"]) &
+                     (ytar >= 0))
      df_cut = df[data_cut].copy()
 
      run_weight = float(weight[i])
@@ -224,14 +245,23 @@ for i, runnum in enumerate(runnums):
              hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
              hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
 
-             yvals = df_cut["H_gtr_y"].values
-
-             if var == "H_kin_W2":
-                 if "H_kin_W" not in df_cut.columns:
-                     raise KeyError("H_kin_W branch missing - cannot compute H_kin_W2 for dummy!")
-                 varvals = df_cut["H_kin_W"].values**2
-             else:
-                 varvals = df_cut[var].values
+             if rootfile_type == 0:
+                 yvals = df_cut["H.gtr.y"].values
+                 if var == "H.kin.W2":
+                     if "H.kin.W" not in df_cut.columns:
+                         raise KeyError("H.kin.W branch missing - cannot compute H.kin.W2 for dummy!")
+                     varvals = df_cut["H.kin.W"].values**2
+                 else:
+                     varvals = df_cut[var].values
+                     
+             elif rootfile_type == 1:
+                 yvals = df_cut["H_gtr_y"].values
+                 if var == "H_kin_W2":
+                     if "H_kin_W" not in df_cut.columns:
+                         raise KeyError("H_kin_W branch missing - cannot compute H_kin_W2 for dummy!")
+                     varvals = df_cut["H_kin_W"].values**2
+                 else:
+                     varvals = df_cut[var].values
 
              y_mid = 0.0
              upstream_mask = yvals < y_mid
@@ -269,10 +299,16 @@ for i, runnum in enumerate(runnums):
              
          else:     
              hist = bh.Histogram(axis, storage=bh.storage.Weight())
-             if var == "H_kin_W2":
-                 values = df_cut["H_kin_W"].values**2
-             else:
-                 values = df_cut[var].values
+             if rootfile_type == 0:
+                 if var == "H.kin.W2":
+                     values = df_cut["H.kin.W"].values**2
+                 else:
+                     values = df_cut[var].values
+             elif rootfile_type == 1:
+                 if var == "H_kin_W2":
+                     values = df_cut["H_kin_W"].values**2
+                 else:
+                     values = df_cut[var].values
                  
              hist.fill(values, weight=np.full(len(values), run_weight))
 
