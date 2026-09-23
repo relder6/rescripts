@@ -5,9 +5,12 @@ import os, re, sys
 
 R_directory = "../LT_separations/DELTA_R/CSVs"
 
-csv_files = [f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_c_to_ld2.csv",
-             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_cu_to_ld2.csv",
-             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_al_to_ld2.csv"]
+csv_files = [f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_phaseI_c_to_ld2.csv",
+             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_phaseI_cu_to_ld2.csv",
+             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_phaseI_al_to_ld2.csv",
+             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_phaseII_c_to_ld2.csv",
+             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_phaseII_cu_to_ld2.csv",
+             f"{R_directory}/DELTA_R_HMSDIS_rosenbluth_fit_phaseII_al_to_ld2.csv"]
 
 all_rows = []
 
@@ -20,7 +23,8 @@ for filepath in csv_files:
 
     df = pd.read_csv(filepath)
 
-    m = re.search(r'fit_([a-z0-9]+)\_to_ld2.csv', os.path.basename(filepath))
+    m = re.search(r'phase[I|V|X]+_([a-z]+)_to_ld2\.csv', os.path.basename(filepath))
+
     if m:
         target_label = m.group(1)
     else:
