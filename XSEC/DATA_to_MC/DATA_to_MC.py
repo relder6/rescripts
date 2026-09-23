@@ -81,8 +81,7 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
         if target_abbrev in {"ld2", "lh2"}:
             dummy_filepath = f"{dummy_dir}/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
             df_dummy = pd.read_csv(dummy_filepath)
-            dummy_var = f"{var}_{target_abbrev}"
-            df_var_dummy = df_dummy[df_dummy["variable"] == dummy_var]
+            df_var_dummy = df_dummy[df_dummy["variable"] == var]
 
             if df_var_dummy.empty:
                 print(f"WARNING: No dummy data for variable {var}; skipping")
@@ -183,15 +182,6 @@ if target_abbrev in {"al", "c", "cu", "ld2", "lh2", "dummy_up", "dummy_down"}:
         #     err_mc = np.sqrt(np.sum(df_var.loc[mc_mask_err, bin_cols].astype(float).values**2, axis=0))
 
         if target_abbrev in {"ld2", "lh2"}:
-
-            print("\nDEBUG dummy:")
-            print("df_var_dummy shape:", df_var_dummy.shape)
-            print("df_var_dummy columns:", df_var_dummy.columns.tolist())
-            print("pos_mask_dummy_err:", pos_mask_dummy_err)
-            print("number selected:", pos_mask_dummy_err.sum())
-
-            print("\nSelected rows:")
-            print(df_var_dummy.loc[pos_mask_dummy_err, bin_cols_dummy])
             
             err_neg_dummy = df_var_dummy.loc[elec_mask_dummy_err, bin_cols_dummy].astype(float).iloc[0].values
 
