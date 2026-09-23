@@ -32,8 +32,8 @@ skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
                 # 25396, 25397]
                 
 bigtable_filepaths = {"I": "/w/hallc-scshelf2102/c-rsidis/relder/hallc_replay_rsidis/AUX_FILES/rsidis_bigtable_pass0p1.csv",
-                      "II": "/lustre24/expphy/volatile/hallc/c-rsidis/relder/STUFF/rsidis_bigtable_phaseII.csv"}
-report_filepaths = {"I": "/w/hallc-scshelf2102/c-rsidis/replay/pass0p1/REPORT_OUTPUT/HMS/PRODUCTION",
+                      "II": "/w/hallc-scshelf2102/c-rsidis/relder/rsidis_bigtable_phaseII.csv"}
+report_filepaths = {"I": "/work/hallc/c-rsidis/replay/pass0p1/REPORT_OUTPUT/HMS/PRODUCTION",
                     "II": "/volatile/hallc/c-rsidis/relder/STUFF/REPORT_PHASEII"}
 
 master_output_filepath = f"MASTER_hmsdis.csv"
@@ -198,7 +198,8 @@ for phase in phases:
                                        "elclean_rate": elclean_rate,
                                        "elclean_counts": elclean_counts})
 
-report_df_master = pd.DataFrame(report_rows_master)
+report_df_master = pd.DataFrame(report_rows_master, columns=["runnum", "3of4_rate", "3of4_counts", "elclean_rate", "elclean_counts"])
+
 # -----------------------------------------------------
 # Writing master file
 # -----------------------------------------------------
