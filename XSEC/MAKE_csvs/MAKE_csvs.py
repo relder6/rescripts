@@ -10,9 +10,11 @@ import matplotlib.pyplot as plt
 import boost_histogram as bh
 import os, re, sys
 import csv
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)    
+    sys.path.insert(0, BASE_DIR)
+    
 from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_cuts, get_flags, parse_phase
 
 # -----------------------------------------------------
@@ -21,7 +23,6 @@ from INIT.config import parse_run_type, parse_beam_pass, parse_target, get_data_
 rootfile_type = 1 #0 for full rootfile, 1 for skimfiles
 
 flags = get_flags()
-
 USING_DELTA_CORR = flags["USING_DELTA_CORR"]
 
 arg1 = sys.argv[1] if len(sys.argv) > 1 else None
@@ -37,19 +38,24 @@ phase = parse_phase(arg4)
 # -----------------------------------------------------
 # Filepaths
 # -----------------------------------------------------
-if phase == "I":
-    rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0p1"
-elif phase == "II":
-    rootfile_dir = "/volatile/hallc/c-rsidis/relder/STUFF"
+# if phase == "I":
+#     rootfile_dir = "/work/hallc/c-rsidis/skimfiles/pass0p1"
+# elif phase == "II":
+#     rootfile_dir = "/volatile/hallc/c-rsidis/relder/STUFF"
+
+rootfile_dir = "/w/hallc-scshelf2102/c-rsidis/skimfiles/pass1"
+
 mc_dir = "/work/hallc/c-rsidis/relder/mc-single-arm"
+
 if target_abbrev not in {"dummy_up", "dummy_down"}:
-    input_settings_filepath = f"../../FILTER_type/{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
+    filter_type_filepath = f"../../FILTER_type/{target_abbrev.upper()}/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}.csv"
 else:
-    input_settings_filepath = f"../../FILTER_type/DUMMY/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
+    filter_type_filepath = f"../../FILTER_type/DUMMY/filtered_{selected_run_type}_{selected_beam_pass}pass_phase{phase}_dummy.csv"
+
 output_dir = f"{target_abbrev.upper()}"
 
-if not os.path.exists(input_settings_filepath):
-    print(f"File {input_settings_filepath} not found; Exiting...")
+if not os.path.exists(filter_type_filepath):
+    print(f"File {filter_type_filepath} not found; Exiting...")
     sys.exit(0)
 
 # -----------------------------------------------------
@@ -69,11 +75,10 @@ if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
             normfac_line = [line for line in infile if "NORMFAC" in line.upper()]
         normfac = float(normfac_line[0].split(":")[1].split()[0]) if normfac_line else None
     else:
-        print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Zeroes will be written in MC row.")    
-    # print(f"DEBUG: normfac found:{normfac}")
+        print(f"WARNING:\tNo mc-single-arm generated root file found: '{mc_filepath}'. Zeroes will be written in MC row.")
 
 # -----------------------------------------------------
-# Defining branches, using uproot to put them in data frames
+# Reading run settings
 # -----------------------------------------------------
 runnums = []
 weight = []
@@ -81,26 +86,29 @@ charge = []
 current = []
 polarity = []
 
-with open(input_settings_filepath, "r", newline="") as csvfile:
+with open(filter_type_filepath, "r", newline="") as csvfile:
     reader = csv.DictReader(csvfile)
+    
     for row in reader:
         try:
-            #runnums.append(int(row["runnum"]))
             runnums.append(row["runnum"])
             charge.append(row["qbeam_2"])
             current.append(row["ibeam_2"])
             weight.append(row["weight"])
+            
             hms_p_val = float(row["hms_p"])
             polarity.append("-" if hms_p_val < 0 else "+")
+            
         except KeyError:
             continue
         except ValueError:
             continue
 
 # -----------------------------------------------------
-# Defining branches, using uproot to put them in data frames
+# Defining branches and MC mapping
 # -----------------------------------------------------
-branches_mc = ["hsdelta", "q2", "xb", "w", "weight", "eprime", "hsytar", "hsxptar", "hsyptar", "hsxfp", "hsxpfp", "hsyfp", "hsypfp"]
+branches_mc = ["hsdelta", "q2", "xb", "w", "weight", "eprime", "hsytar",
+               "hsxptar", "hsyptar", "hsxfp", "hsxpfp", "hsyfp", "hsypfp"]
 
 branches = ["H.gtr.dp", "H.cal.etottracknorm", "H.gtr.ph",
             "H.gtr.th", "H.gtr.x", "H.gtr.y",
@@ -116,8 +124,6 @@ variable_mc_map = {"H.gtr.dp": "hsdelta",
                    "H.kin.W": "w",
                    "H.gtr.p": "eprime",
                    "H.gtr.y": "hsytar",
-                   "H.gtr.th": "hsxptar",
-                   "H.gtr.ph": "hsyptar",
                    "H.dc.x_fp": "hsxfp",
                    "H.dc.xp_fp": "hsxpfp",
                    "H.dc.y_fp": "hsyfp",
@@ -131,60 +137,44 @@ if rootfile_type == 1:
 # -----------------------------------------------------
 # Binning
 # -----------------------------------------------------
+custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
+               "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
+               "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
+               "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
+               "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
+               "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
+               "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
+               "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),}
+
 if selected_beam_pass == "3":
-    custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
-                   "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
-                   "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
-                   "H.kin.Q2": dict(binnum = 20, min = 2.900, max = 6.000),
-                   "H.kin.x_bj": dict(binnum = 20, min = 0.2, max = 0.7),
-                   "H.kin.W": dict(binnum = 20, min = 2.000, max = 3.000),
-                   "H.gtr.p": dict(binnum = 100, min = 1.000, max = 1.400),
-                   "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
-                   "H.gtr.th": dict(binnum = 100, min = -0.1, max = 0.1),
-                   "H.gtr.ph": dict(binnum = 100, min = -0.05, max = 0.05),
-                   "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
-                   "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-                   "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
-                   "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-                   "H.kin.W2": dict(binnum = 20, min = 4.00, max = 9.00),}
-    
+    custom_bins["H.kin.Q2"] = dict(binnum=20, min=2.900, max=6.000)
+    custom_bins["H.kin.x_bj"] = dict(binnum=20, min=0.2, max=0.7)
+    custom_bins["H.kin.W"] = dict(binnum=20, min=2.000, max=3.000)
+    custom_bins["H.gtr.p"] = dict(binnum=100, min=1.000, max=1.400)
+    custom_bins["H.kin.W2"] = dict(binnum=20, min=4.00, max=9.00)
+
 if selected_beam_pass == "4":
-    custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
-                   "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
-                   "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
-                   "H.kin.Q2": dict(binnum = 20, min = 2.400, max = 4.200),
-                   "H.kin.x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
-                   "H.kin.W": dict(binnum = 20, min = 3.100, max = 3.500),
-                   "H.gtr.p": dict(binnum = 100, min = 1.3, max = 1.8),
-                   "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
-                   "H.gtr.th": dict(binnum = 100, min = -0.1, max = 0.1),
-                   "H.gtr.ph": dict(binnum = 100, min = -0.05, max = 0.05),
-                   "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
-                   "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-                   "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
-                   "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-                   "H.kin.W2": dict(binnum = 20, min = 9.6, max = 12.3),}
-    
+    custom_bins["H.kin.Q2"] = dict(binnum=20, min=2.400, max=4.200)
+    custom_bins["H.kin.x_bj"] = dict(binnum=20, min=0.175, max=0.325)
+    custom_bins["H.kin.W"] = dict(binnum=20, min=3.100, max=3.500)
+    custom_bins["H.gtr.p"] = dict(binnum=100, min=1.3, max=1.8)
+    custom_bins["H.kin.W2"] = dict(binnum=20, min=9.6, max=12.3)
+
 if selected_beam_pass == "5":
-    custom_bins = {"H.gtr.dp": dict(binnum = 20, min = -10.000, max = 10.000),
-                   "H.gtr.ph": dict(binnum = 20, min = -0.050, max = 0.050),
-                   "H.gtr.th": dict(binnum = 20, min = -0.100, max = 0.100),
-                   "H.kin.Q2": dict(binnum = 20, min = 2.400, max = 4.200),
-                   "H.kin.x_bj": dict(binnum = 20, min = 0.175, max = 0.325),
-                   "H.kin.W": dict(binnum = 20, min = 3.100, max = 3.500),
-                   "H.gtr.p": dict(binnum = 100, min = 3.2, max = 5.2),
-                   "H.gtr.y": dict(binnum = 100, min = -4.0, max = 4.0),
-                   "H.gtr.th": dict(binnum = 100, min = -0.1, max = 0.1),
-                   "H.gtr.ph": dict(binnum = 100, min = -0.05, max = 0.05),
-                   "H.dc.x_fp": dict(binnum = 20, min = -50, max = 50),
-                   "H.dc.xp_fp": dict(binnum = 20, min = -0.08, max = 0.08),
-                   "H.dc.y_fp": dict(binnum = 20, min = -30, max = 30),
-                   "H.dc.yp_fp": dict(binnum = 20, min = -0.04, max = 0.04),
-                   "H.kin.W2": dict(binnum = 20, min = 9.6, max = 12.3),}
+    custom_bins["H.kin.Q2"] = dict(binnum=20, min=2.400, max=4.200)
+    custom_bins["H.kin.x_bj"] = dict(binnum=20, min=0.175, max=0.325)
+    custom_bins["H.kin.W"] = dict(binnum=20, min=3.100, max=3.500)
+    custom_bins["H.gtr.p"] = dict(binnum=100, min=3.2, max=5.2)
+    custom_bins["H.kin.W2"] = dict(binnum=20, min=9.6, max=12.3)
+
+# Histograms
+custom_bins[("H.gtr.th", "H.gtr.ph")] = (np.linspace(-0.1, 0.1, 20), np.linspace(-0.05, 0.05, 20))
+custom_bins[("H.gtr.th", "H.gtr.ph", "H.gtr.dp")] = (np.linspace(-0.1, 0.1, 20), np.linspace(-0.05, 0.05, 20), np.linspace(-10.0, 10.0, 21))
 
 if rootfile_type == 1:
-    custom_bins = {key.replace(".", "_"): value for key, value in custom_bins.items()}
-    
+    custom_bins = {tuple(item.replace(".", "_") for item in key)
+                   if isinstance(key, tuple) else key.replace(".", "_"): value
+                   for key, value in custom_bins.items()}
 
 # -----------------------------------------------------
 # Data histogram and csv creation
@@ -193,141 +183,226 @@ hist_data = {}
 hist_err_data = {}
 bin_edges_dict = {}
 
+hist2d_data = {}
+hist2d_err_data = {}
+bin_edges_2d_dict = {}
+
 cuts = get_data_cuts()
 
 for var, bins in custom_bins.items():
-    axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
-    bin_edges_dict[var] = axis.edges
-    hist_data[var] = []
-    hist_err_data[var] = []
+    if isinstance(var, tuple):
+        bin_edges_2d_dict[var] = bins
+        hist2d_data[var] = []
+        hist2d_err_data[var] = []
+        
+    else:
+        axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
+        bin_edges_dict[var] = axis.edges
+        hist_data[var] = []
+        hist_err_data[var] = []
 
+# -----------------------------------------------------
+# Data histogram filling
+# -----------------------------------------------------
 for i, runnum in enumerate(runnums):
-     if rootfile_type == 0:
-         rootfile_path = f"{rootfile_dir}/hms_coin_replay_production_{runnum}_-1.root"
-     if rootfile_type == 1:
-         rootfile_path = f"{rootfile_dir}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
-     if not os.path.exists(rootfile_path):
-         print(f"WARNING: Missing {rootfile_path}, skipping...")
-         continue
-     tree = uproot.open(rootfile_path)["T"]
-     arr = tree.arrays(branches, library = "np")
-     df = pd.DataFrame(arr)
+    if rootfile_type == 0:
+        rootfile_path = f"{rootfile_dir}/hms_coin_replay_production_{runnum}_-1.root"
+         
+    elif rootfile_type == 1:
+        rootfile_path = f"{rootfile_dir}/skimmed_hms_coin_replay_production_{runnum}_-1.root"
+         
+    if not os.path.exists(rootfile_path):
+        print(f"WARNING: Missing {rootfile_path}, skipping...")
+        continue
      
-     if rootfile_type == 0:
-         dp = df["H.gtr.dp"]
-         cer = df["H.cer.npeSum"]
-         cal = df["H.cal.etottracknorm"]
-         ytar = df["H.gtr.y"]
-     elif rootfile_type == 1:
-         dp = df["H_gtr_dp"]
-         cer = df["H_cer_npeSum"]
-         cal = df["H_cal_etottracknorm"]
-         ytar = df["H_gtr_y"]
+    tree = uproot.open(rootfile_path)["T"]
+    arr = tree.arrays(branches, library = "np")
+    df = pd.DataFrame(arr)
+     
+    if rootfile_type == 0:
+        dp = df["H.gtr.dp"]
+        cer = df["H.cer.npeSum"]
+        cal = df["H.cal.etottracknorm"]
+        ytar = df["H.gtr.y"]
          
-     if target_abbrev not in {"dummy_up", "dummy_down"}:
+    elif rootfile_type == 1:
+        dp = df["H_gtr_dp"]
+        cer = df["H_cer_npeSum"]
+        cal = df["H_cal_etottracknorm"]
+        ytar = df["H_gtr_y"]
+         
+    if target_abbrev not in {"dummy_up", "dummy_down"}:
+        data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                    (cer > cuts["H_cer_npeSum_cut"]) &
+                    (cal > cuts["H_cal_etottracknorm_cut"]))
+         
+    elif target_abbrev == "dummy_up":
+        data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                    (cer > cuts["H_cer_npeSum_cut"]) &
+                    (cal > cuts["H_cal_etottracknorm_cut"]) &
+                    (ytar < 0))
+         
+    elif target_abbrev == "dummy_down":
+        data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
+                    (cer > cuts["H_cer_npeSum_cut"]) &
+                    (cal > cuts["H_cal_etottracknorm_cut"]) &
+                    (ytar >= 0))
+         
+    df_cut = df[data_cut].copy()
 
-         data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                     (cer > cuts["H_cer_npeSum_cut"]) &
-                     (cal > cuts["H_cal_etottracknorm_cut"]))
-     elif target_abbrev == "dummy_up":
-         data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                     (cer > cuts["H_cer_npeSum_cut"]) &
-                     (cal > cuts["H_cal_etottracknorm_cut"]) &
-                     (ytar < 0))
-     elif target_abbrev == "dummy_down":
-         data_cut = (dp.between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]) &
-                     (cer > cuts["H_cer_npeSum_cut"]) &
-                     (cal > cuts["H_cal_etottracknorm_cut"]) &
-                     (ytar >= 0))
-     df_cut = df[data_cut].copy()
+    run_weight = float(weight[i])
 
-     run_weight = float(weight[i])
+    for var, bins in custom_bins.items():
+        # 2D Histograms
+        if isinstance(var, tuple):
+            axes = [bh.axis.Variable(edges, underflow=True, overflow=True) for edges in bins]
+            values = [df_cut[name.replace("W2", "W")].to_numpy()**2 if name in {"H.kin.W2", "H_kin_W2"} else df_cut[name].to_numpy() for name in var]
 
-     for var, bins in custom_bins.items():
-         axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
+            if target_abbrev == "dummy":
+                hist_lh2 = bh.Histogram(*axes, storage=bh.storage.Weight())
+                hist_ld2 = bh.Histogram(*axes, storage=bh.storage.Weight())
 
-         if target_abbrev == "dummy":
-             hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
-             hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
+                if rootfile_type == 0:
+                    ytar_vals = df_cut["H.gtr.y"].values
+                elif rootfile_type == 1:
+                    ytar_vals = df_cut["H_gtr_y"].values
 
-             if rootfile_type == 0:
-                 yvals = df_cut["H.gtr.y"].values
-                 if var == "H.kin.W2":
-                     if "H.kin.W" not in df_cut.columns:
-                         raise KeyError("H.kin.W branch missing - cannot compute H.kin.W2 for dummy!")
-                     varvals = df_cut["H.kin.W"].values**2
-                 else:
-                     varvals = df_cut[var].values
-                     
-             elif rootfile_type == 1:
-                 yvals = df_cut["H_gtr_y"].values
-                 if var == "H_kin_W2":
-                     if "H_kin_W" not in df_cut.columns:
-                         raise KeyError("H_kin_W branch missing - cannot compute H_kin_W2 for dummy!")
-                     varvals = df_cut["H_kin_W"].values**2
-                 else:
-                     varvals = df_cut[var].values
+                upstream_mask = ytar_vals < 0.0
+                downstream_mask = ytar_vals >= 0.0
 
-             y_mid = 0.0
-             upstream_mask = yvals < y_mid
-             downstream_mask = yvals >= y_mid
+                if phase == "I":
+                    R_dummy_lh2_up, R_dummy_lh2_down = 1 / 8.2325, 1 / 6.4468
+                    R_dummy_ld2_up, R_dummy_ld2_down = 1 / 9.4990, 1 / 6.5493
 
-             if phase == "I":
-                 R_dummy_lh2_up, R_dummy_lh2_down = 1 / 8.2325, 1 / 6.4468
-                 R_dummy_ld2_up, R_dummy_ld2_down = 1 / 9.4990, 1 / 6.5493
-             elif phase == "II":
-                 R_dummy_lh2_up, R_dummy_lh2_down = 1 / 4.43654, 1 / 3.48419
-                 R_dummy_ld2_up, R_dummy_ld2_down = 1 / 5.11908, 1 / 3.53979
+                elif phase == "II":
+                    R_dummy_lh2_up, R_dummy_lh2_down = 1 / 4.43654, 1 / 3.48419
+                    R_dummy_ld2_up, R_dummy_ld2_down = 1 / 5.11908, 1 / 3.53979
 
-             weights_lh2 = np.zeros(len(yvals))
-             weights_lh2[upstream_mask] = R_dummy_lh2_up * run_weight
-             weights_lh2[downstream_mask] = R_dummy_lh2_down * run_weight
+                weights_lh2 = np.zeros(len(df_cut))
+                weights_lh2[upstream_mask] = R_dummy_lh2_up * run_weight
+                weights_lh2[downstream_mask] = R_dummy_lh2_down * run_weight
 
-             weights_ld2 = np.zeros(len(yvals))
-             weights_ld2[upstream_mask] = R_dummy_ld2_up * run_weight
-             weights_ld2[downstream_mask] = R_dummy_ld2_down * run_weight
+                weights_ld2 = np.zeros(len(df_cut))
+                weights_ld2[upstream_mask] = R_dummy_ld2_up * run_weight
+                weights_ld2[downstream_mask] = R_dummy_ld2_down * run_weight
 
-             hist_lh2.fill(varvals, weight=weights_lh2)
-             hist_ld2.fill(varvals, weight=weights_ld2)
+                hist_lh2.fill(*values, weight=weights_lh2)
+                hist_ld2.fill(*values, weight=weights_ld2)
 
-             counts_lh2 = hist_lh2.view().value
-             counts_ld2 = hist_ld2.view().value
+                counts_lh2 = hist_lh2.view().value.flatten()
+                counts_ld2 = hist_ld2.view().value.flatten()
 
-             errors_lh2 = np.sqrt(hist_lh2.view().variance)
-             errors_ld2 = np.sqrt(hist_ld2.view().variance)
+                errors_lh2 = np.sqrt(hist_lh2.view().variance).flatten()
+                errors_ld2 = np.sqrt(hist_ld2.view().variance).flatten()
 
-             hist_data.setdefault(var + "_lh2", []).append([runnum, charge[i], current[i], polarity[i]] + counts_lh2.tolist())
-             hist_err_data.setdefault(var + "_lh2", []).append([runnum, charge[i], current[i], polarity[i]] + errors_lh2.tolist())
+                hist2d_data.setdefault(var + ("lh2",), []).append([runnum, charge[i], current[i], polarity[i]] + counts_lh2.tolist())
 
-             hist_data.setdefault(var + "_ld2", []).append([runnum, charge[i], current[i], polarity[i]] + counts_ld2.tolist())
-             hist_err_data.setdefault(var + "_ld2", []).append([runnum, charge[i], current[i], polarity[i]] + errors_ld2.tolist())
+                hist2d_err_data.setdefault(var + ("lh2",), []).append([runnum, charge[i], current[i], polarity[i]] + errors_lh2.tolist())
+
+                hist2d_data.setdefault(var + ("ld2",), []).append([runnum, charge[i], current[i], polarity[i]] + counts_ld2.tolist())
+
+                hist2d_err_data.setdefault(var + ("ld2",), []).append([runnum, charge[i], current[i], polarity[i]] + errors_ld2.tolist())
+
+            else:
+                hist = bh.Histogram(*axes, storage=bh.storage.Weight())
+                hist.fill(*values, weight=np.full(len(df_cut), run_weight))
+
+                counts = hist.view().value.flatten()
+                errors = np.sqrt(hist.view().variance).flatten()
+
+                hist2d_data[var].append([runnum, charge[i], current[i], polarity[i]] + counts.tolist())
+
+                hist2d_err_data[var].append([runnum, charge[i], current[i], polarity[i]] + errors.tolist())
+
+            continue
+
+        # 1D Histograms
+        axis = bh.axis.Regular(bins["binnum"], bins["min"], bins["max"], underflow=True, overflow=True)
+
+        if target_abbrev == "dummy":
+            hist_lh2 = bh.Histogram(axis, storage=bh.storage.Weight())
+            hist_ld2 = bh.Histogram(axis, storage=bh.storage.Weight())
+
+            if rootfile_type == 0:
+                yvals = df_cut["H.gtr.y"].values
+                if var == "H.kin.W2":
+                    if "H.kin.W" not in df_cut.columns:
+                        raise KeyError("H.kin.W branch missing - cannot compute H.kin.W2 for dummy!")
+                    varvals = df_cut["H.kin.W"].values**2
+                else:
+                    varvals = df_cut[var].values
+
+            elif rootfile_type == 1:
+                yvals = df_cut["H_gtr_y"].values
+                if var in {"H_kin_W2", "H.kin.W2"}:
+                    if "H_kin_W" not in df_cut.columns:
+                        raise KeyError("H_kin_W branch missing - cannot compute H_kin_W2 for dummy!")
+                    varvals = df_cut["H_kin_W"].values**2
+                else:
+                    varvals = df_cut[var].values
+
+            y_mid = 0.0
+            upstream_mask = yvals < y_mid
+            downstream_mask = yvals >= y_mid
+
+            if phase == "I":
+                R_dummy_lh2_up, R_dummy_lh2_down = 1 / 8.2325, 1 / 6.4468
+                R_dummy_ld2_up, R_dummy_ld2_down = 1 / 9.4990, 1 / 6.5493
+            elif phase == "II":
+                R_dummy_lh2_up, R_dummy_lh2_down = 1 / 4.43654, 1 / 3.48419
+                R_dummy_ld2_up, R_dummy_ld2_down = 1 / 5.11908, 1 / 3.53979
+
+            weights_lh2 = np.zeros(len(yvals))
+            weights_lh2[upstream_mask] = R_dummy_lh2_up * run_weight
+            weights_lh2[downstream_mask] = R_dummy_lh2_down * run_weight
+
+            weights_ld2 = np.zeros(len(yvals))
+            weights_ld2[upstream_mask] = R_dummy_ld2_up * run_weight
+            weights_ld2[downstream_mask] = R_dummy_ld2_down * run_weight
+
+            hist_lh2.fill(varvals, weight=weights_lh2)
+            hist_ld2.fill(varvals, weight=weights_ld2)
+
+            counts_lh2 = hist_lh2.view().value
+            counts_ld2 = hist_ld2.view().value
+
+            errors_lh2 = np.sqrt(hist_lh2.view().variance)
+            errors_ld2 = np.sqrt(hist_ld2.view().variance)
+
+            hist_data.setdefault(var + "_lh2", []).append([runnum, charge[i], current[i], polarity[i]] + counts_lh2.tolist())
+            hist_err_data.setdefault(var + "_lh2", []).append([runnum, charge[i], current[i], polarity[i]] + errors_lh2.tolist())
+
+            hist_data.setdefault(var + "_ld2", []).append([runnum, charge[i], current[i], polarity[i]] + counts_ld2.tolist())
+            hist_err_data.setdefault(var + "_ld2", []).append([runnum, charge[i], current[i], polarity[i]] + errors_ld2.tolist())
              
-         else:     
-             hist = bh.Histogram(axis, storage=bh.storage.Weight())
-             if rootfile_type == 0:
-                 if var == "H.kin.W2":
-                     values = df_cut["H.kin.W"].values**2
-                 else:
-                     values = df_cut[var].values
-             elif rootfile_type == 1:
-                 if var == "H_kin_W2":
-                     values = df_cut["H_kin_W"].values**2
-                 else:
-                     values = df_cut[var].values
+        else:     
+            hist = bh.Histogram(axis, storage=bh.storage.Weight())
+            if rootfile_type == 0:
+                if var == "H.kin.W2":
+                    values = df_cut["H.kin.W"].values**2
+                else:
+                    values = df_cut[var].values
+            elif rootfile_type == 1:
+                if var == "H_kin_W2":
+                    values = df_cut["H_kin_W"].values**2
+                else:
+                    values = df_cut[var].values
                  
-             hist.fill(values, weight=np.full(len(values), run_weight))
+            hist.fill(values, weight=np.full(len(values), run_weight))
 
-             counts = hist.view().value
-             errors = np.sqrt(hist.view().variance)
+            counts = hist.view().value
+            errors = np.sqrt(hist.view().variance)
          
-             hist_data[var].append([runnum, charge[i], current[i], polarity[i]]+counts.tolist())
-             hist_err_data[var].append([runnum, charge[i], current[i], polarity[i]]+errors.tolist())
+            hist_data[var].append([runnum, charge[i], current[i], polarity[i]]+counts.tolist())
+            hist_err_data[var].append([runnum, charge[i], current[i], polarity[i]]+errors.tolist())
 
 # -----------------------------------------------------
 # Monte carlo histogram and csv creation
 # -----------------------------------------------------
 mc_hist_data = {}
 mc_hist_err = {}
+mc_hist2d_data = {}
+mc_hist2d_err = {}
 
 if mc_exists:
     if target_abbrev not in {"dummy", "optics1", "optics2", "hole"}:
@@ -337,14 +412,77 @@ if mc_exists:
         df_mc = pd.DataFrame(mc_tree.arrays(branches_mc, library="np"))
         mc_cut = (df_mc["hsdelta"].between(cuts["H_gtr_dp_min_cut"], cuts["H_gtr_dp_max_cut"]))
         df_mc_cut = df_mc[mc_cut].copy()
-        if df_mc_cut.empty:
-            print("ERROR: df_mc_cut is EMPTY — hsdelta cut removed everything.")
         mc_hist_data = {}
         mc_hist_err = {}
 
     for var, bins in custom_bins.items():
-        mc_var = None
+        #2D Histograms
+        if isinstance(var, tuple):
+            mc_vars = [variable_mc_map.get(name) for name in var]
 
+            if any(name is None for name in mc_vars):
+                continue
+
+            axes = [bh.axis.Variable(edges, underflow=True, overflow=True) for edges in bins]
+            hist_mc = bh.Histogram(*axes, storage=bh.storage.Weight())
+
+            if "weight" in df_mc_cut.columns:
+                delta_temp = df_mc_cut["hsdelta"].values
+                deltacorr = 1.0
+
+                if target_abbrev in {"al", "c", "cu", "dummy_up", "dummy_down"}:
+                    if phase == "I":
+                        a = 1.012441e+00
+                        b = 3.055522e-03
+                        c = -1.111970e-03
+                        d = -6.311775e-05
+                        e = 1.411932e-05
+
+                    elif phase == "II":
+                        a = 1
+                        b = 0
+                        c = 0
+                        d = 0
+                        e = 0
+
+                    deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
+
+                elif target_abbrev in {"ld2", "lh2", "dummy"}:
+                    if phase == "I":
+                        a = 1.011192e+00
+                        b = 5.168480e-03
+                        c = -1.104189e-03
+                        d = -9.446273e-05
+                        e = 1.550629e-05
+
+                    elif phase == "II":
+                        a = 1
+                        b = 0
+                        c = 0
+                        d = 0
+                        e = 0
+
+                    deltacorr = (a + b * delta_temp + c * delta_temp**2 + d * delta_temp**3 + e * delta_temp**4)
+
+                if USING_DELTA_CORR:
+                    event_weights = df_mc_cut["weight"].values * normfac * deltacorr
+                else:
+                    event_weights = df_mc_cut["weight"].values * normfac
+
+            else:
+                print("Weights branch not found.  Exiting...")
+                print(df_mc_cut.columns.tolist())
+                exit(1)
+
+            mc_values = [df_mc_cut[mc_name].to_numpy()**2 if name in {"H.kin.W2", "H_kin_W2"} else df_mc_cut[mc_name].to_numpy() for name, mc_name in zip(var, mc_vars)]
+            hist_mc.fill(*mc_values, weight=event_weights)
+            
+            mc_hist2d_data[var] = hist_mc.view().value.flatten().tolist()
+            mc_hist2d_err[var] = np.sqrt(hist_mc.view().variance).flatten().tolist()
+
+            continue
+
+        # 1D Histogram
         if target_abbrev not in {"optics1", "optics2", "hole"}:
             mc_var = variable_mc_map.get(var)
 
@@ -416,13 +554,12 @@ if mc_exists:
 # -----------------------------------------------------
 # Saving consolidated CSV
 # -----------------------------------------------------
-
 all_rows = []
 
 for var, rows in hist_data.items():
 
-    base_var = var.replace("_lh2", "").replace("_ld2", "")
-    output_var = base_var.replace(".", "_")
+    base_var = var.removesuffix("_lh2").removesuffix("_ld2")
+    output_var = var.replace(".", "_")
 
     bin_edges = bin_edges_dict[base_var]
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
@@ -483,3 +620,58 @@ output_filepath = (f"{output_dir}/{selected_run_type}_{selected_beam_pass}pass_p
 output_df.to_csv(output_filepath, index=False)
 
 print(f"Saved {len(runnums)} runs to CSV: {output_filepath}")
+
+# -----------------------------------------------------
+# Saving separate multidimensional histogram CSVs
+# -----------------------------------------------------
+os.makedirs(f"{output_dir}/HISTOS", exist_ok=True)
+
+for var, rows in hist2d_data.items():
+    if not rows:
+        continue
+
+    if var[-1] in {"lh2", "ld2"}:
+        base_var = var[:-1]
+        suffix = f"_{var[-1]}"
+    else:
+        base_var = var
+        suffix = ""
+
+    output_var = "_vs_".join(name.replace(".", "_") for name in base_var) + suffix
+    edges = bin_edges_2d_dict[base_var]
+    shape = tuple(len(axis_edges) - 1 for axis_edges in edges)
+    ndim = len(shape)
+    axis_names = ["x", "y", "z"][:ndim] + [f"axis{i + 1}" for i in range(3, ndim)]
+
+    indices = np.indices(shape).reshape(ndim, -1).T
+    geometry = []
+
+    for index in indices:
+        bin_info = index.tolist()
+        for axis_edges, ibin in zip(edges, index):
+            bin_info.extend([axis_edges[ibin], axis_edges[ibin + 1], 0.5 * (axis_edges[ibin] + axis_edges[ibin + 1])])
+        geometry.append(bin_info)
+
+    columns = ["type", "runnum", "charge", "current", "polarity"]
+    columns += [f"{name}bin" for name in axis_names]
+    for name in axis_names:
+        columns += [f"{name}_bin_min", f"{name}_bin_max", f"{name}_bin_center"]
+    columns += ["value"]
+
+    output_filepath_nd = f"{output_dir}/HISTOS/{selected_run_type}_{selected_beam_pass}pass_phase{phase}_{target_abbrev}_{output_var}.csv"
+
+    with open(output_filepath_nd, "w", newline="") as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(columns)
+
+        for row_type, source_rows in (("data", rows), ("err", hist2d_err_data[var])):
+            for row in source_rows:
+                metadata = [row_type] + row[:4]
+                writer.writerows(metadata + bin_info + [value] for bin_info, value in zip(geometry, row[4:]))
+
+        if target_abbrev not in {"dummy", "optics1", "optics2", "hole"} and base_var in mc_hist2d_data:
+            for row_type, values in (("mc", mc_hist2d_data[base_var]), ("mc_err", mc_hist2d_err[base_var])):
+                metadata = [row_type, 0, 0, 0, "-"]
+                writer.writerows(metadata + bin_info + [value] for bin_info, value in zip(geometry, values))
+
+    print(f"Saved {ndim}D histogram CSV: {output_filepath_nd}")
