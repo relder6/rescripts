@@ -23,7 +23,8 @@ if USING_CURRENT_CUT:
 else:
     current_cut = 0.0
 
-skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860]
+skip_runnums = [23853, 23854, 23855, 23856, 23857, 23858, 23859, 23860,23918,23919,24289,27999,28004,]
+                # 24792, 24800]
                 #Now skipping the low current (< 10 uA) runs,
                 # 23934,23938,23963,24027,24290,24291,24292,24293,24294,24308,24309,
                 # 24319,24333,24438,24440,24455,24456,24481,24482,24483,24495,24496,
@@ -56,6 +57,9 @@ for phase in phases:
             for row in reader:
                 try:
                     runnum = int(row["run"])
+                    if runnum in skip_runnums:
+                        continue
+                    
                     run_type = row.get("run_type", "N/A")
                     if run_type.strip().lower() != "hmsdis":
                         continue
@@ -145,6 +149,7 @@ for phase in phases:
                                                  "ps3": ps3,
                                                  "ps4": ps4,
                                                  "trackeff": trackeff,
+                                                 "livetime": livetime,
                                                  "nu": nu,
                                                  "boil_corr": boil_corr,
                                                  "epsilon": epsilon,
